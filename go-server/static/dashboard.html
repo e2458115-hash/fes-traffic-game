@@ -1,0 +1,177 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>リアルタイムランキング & サーバー動作ダッシュボード</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; background: #090d16; color: #e2e8f0; margin: 0; padding: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e293b; padding-bottom: 10px; margin-bottom: 20px; }
+    .live-badge { background: #ef4444; color: white; padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; }
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 20px; }
+    h3 { margin-top: 0; color: #38bdf8; border-left: 4px solid #38bdf8; padding-left: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #1f2937; }
+    th { color: #94a3b8; }
+    .rank-1 { color: #fbbf24; font-weight: bold; font-size: 1.1rem; }
+    .metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .metric-box { background: #1e293b; padding: 12px; border-radius: 8px; }
+    .metric-val { font-size: 1.4rem; font-weight: bold; color: #4ade80; margin-top: 4px; }
+    .log-box { background: #000; color: #10b981; font-family: monospace; padding: 12px; border-radius: 6px; margin-top: 15px; height: 90px; overflow-y: auto; font-size: 0.85rem; }
+    canvas { background: #0f172a; border: 1px solid #334155; border-radius: 8px; width: 100%; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h2>📡 大学祭 交通管制センター：リアルタイムランキング & サーバー可視化</h2>
+    <span class="live-badge">● LIVE STREAMING (SSE)</span>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="card" style="margin-bottom: 20px;">
+        <h3>🏆 リアルタイム誘導スコアランキング</h3>
+        <table>
+          <thead><tr><th>順位</th><th>担当者 / プレイヤー名</th><th>スコア</th><th>記録時刻</th></tr></thead>
+          <tbody id="rank-body"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3>🅿️ リアルタイム駐車場空き状況（排他制御同期）</h3>
+        <div class="metrics-grid">
+          <div class="metric-box">
+            <div>A駐車場 (申請者専用)</div>
+            <div class="metric-val" id="dash-park-a">残り 5 台</div>
+          </div>
+          <div class="metric-box">
+            <div>B駐車場 (一般・大型)</div>
+            <div class="metric-val" id="dash-park-b">残り 8 台</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>⚙️ サーバー稼働状況 & Python NetworkX 経路計算</h3>
+      <div class="metrics-grid">
+        <div class="metric-box">
+          <div>Go 応答時間 / 連携状態</div>
+          <div class="metric-val"><span id="m-go-ms">0.0</span> ms <span id="m-mode" style="font-size:0.8rem; color:#38bdf8;"></span></div>
+        </div>
+        <div class="metric-box">
+          <div>Python (NetworkX) 計算時間</div>
+          <div class="metric-val"><span id="m-py-ms">0.0</span> ms</div>
+        </div>
+        <div class="metric-box">
+          <div>Go メモリ使用量 / Goroutine数</div>
+          <div class="metric-val"><span id="m-mem">0</span> KB / <span id="m-go">0</span></div>
+        </div>
+        <div class="metric-box">
+          <div>累計リクエスト処理数</div>
+          <div class="metric-val"><span id="m-pkt">0</span> req</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 15px;">
+        <div style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 5px;">
+          NetworkX グラフ最短経路 & ボトルネック(媒介中心性) リアルタイム描画
+        </div>
+        <canvas id="dashCanvas" width="700" height="330"></canvas>
+      </div>
+
+      <div class="log-box" id="server-log">[SYSTEM] サーバー監視ストリームに接続待機中...</div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('dashCanvas');
+    const ctx = canvas.getContext('2d');
+    let mapData = null;
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    async function loadMap() {
+      const res = await fetch('/api/map');
+      mapData = await res.json();
+    }
+
+    const evtSource = new EventSource('/api/stream');
+    evtSource.onmessage = function(event) {
+      const state = JSON.parse(event.data);
+      renderDashboard(state);
+    };
+
+    function renderDashboard(state) {
+      const tbody = document.getElementById('rank-body');
+      tbody.innerHTML = '';
+      state.leaderboard.forEach((entry, idx) => {
+        const cls = idx === 0 ? 'rank-1' : '';
+        tbody.innerHTML += `<tr class="${cls}"><td>${idx + 1}位</td><td>${escapeHtml(entry.name)}</td><td>${entry.score} pt</td><td>${entry.timestamp}</td></tr>`;
+      });
+
+      const remA = state.parkings.PARK_A.capacity - state.parkings.PARK_A.occupied;
+      const remB = state.parkings.PARK_B.capacity - state.parkings.PARK_B.occupied;
+      document.getElementById('dash-park-a').innerText = `残り ${remA} / ${state.parkings.PARK_A.capacity} 台`;
+      document.getElementById('dash-park-b').innerText = `残り ${remB} / ${state.parkings.PARK_B.capacity} 台`;
+
+      document.getElementById('m-go-ms').innerText = state.metrics.last_go_ms.toFixed(2);
+      document.getElementById('m-py-ms').innerText = state.metrics.last_py_ms.toFixed(3);
+      document.getElementById('m-mode').innerText = state.metrics.engine_mode || "";
+      document.getElementById('m-mem').innerText = state.metrics.memory_kb;
+      document.getElementById('m-go').innerText = state.metrics.goroutines;
+      document.getElementById('m-pkt').innerText = state.metrics.total_packets;
+
+      if (state.metrics.last_action) {
+        const logBox = document.getElementById('server-log');
+        logBox.innerHTML = `<div>> ${escapeHtml(state.metrics.last_action)} (Py: ${state.metrics.last_py_ms}ms)</div>` + logBox.innerHTML;
+      }
+
+      drawGraph(state.last_route);
+    }
+
+    function drawGraph(route) {
+      if (!mapData) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      mapData.edges.forEach(edge => {
+        const from = mapData.nodes[edge.from];
+        const to = mapData.nodes[edge.to];
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 5;
+        ctx.stroke();
+      });
+
+      if (route && route.coords) {
+        ctx.beginPath();
+        ctx.moveTo(route.coords[0].x, route.coords[0].y);
+        for (let i = 1; i < route.coords.length; i++) {
+          ctx.lineTo(route.coords[i].x, route.coords[i].y);
+        }
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 7;
+        ctx.stroke();
+      }
+
+      for (const [name, node] of Object.entries(mapData.nodes)) {
+        const isBottleneck = route && route.bottleneck_node === name;
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, 16, 0, Math.PI * 2);
+        ctx.fillStyle = isBottleneck ? '#ef4444' : (node.type === 'parking' ? '#10b981' : '#f59e0b');
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = '11px sans-serif';
+        ctx.fillText(isBottleneck ? `${name} [ボトルネック]` : name, node.x - 25, node.y - 22);
+      }
+    }
+
+    loadMap();
+  </script>
+</body>
+</html>

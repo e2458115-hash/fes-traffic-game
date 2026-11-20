@@ -3,627 +3,1364 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>デジタルツイン交通管制システム | Real-World Traffic Control</title>
+  <title>Digital Twin Traffic Control v2.3</title>
+
+  <!-- GitHub OSS 1: Leaflet (https://github.com/Leaflet/Leaflet) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- GitHub OSS 2: ngraph.path (https://github.com/anvaka/ngraph.path) -->
+  <script src="https://unpkg.com/ngraph.graph@20.0.1/dist/ngraph.graph.min.js"></script>
+  <script src="https://unpkg.com/ngraph.path@1.3.1/dist/ngraph.path.min.js"></script>
+
+  <!-- GitHub OSS 3: Apache ECharts (https://github.com/apache/echarts) -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #0b1120;
-      color: #f1f5f9;
-      height: 100vh;
+      background: #0b0f19;
+      color: #e2e8f0;
       display: flex;
       flex-direction: column;
+      height: 100vh;
       overflow: hidden;
+      user-select: none;
     }
     header {
-      background: #0f172a;
-      border-bottom: 1px solid #1e293b;
-      padding: 12px 24px;
+      min-height: 48px;
+      background: #111827;
+      border-bottom: 1px solid #1f2937;
       display: flex;
-      justify-content: space-between;
+      flex-wrap: wrap;
       align-items: center;
-      z-index: 10;
+      justify-content: space-between;
+      padding: 5px 14px;
+      gap: 8px;
+      z-index: 1000;
     }
-    .title-group { display: flex; align-items: center; gap: 12px; }
+    .title-area { display: flex; align-items: center; gap: 8px; }
     .badge {
-      background: #0284c7;
+      background: #2563eb;
       color: #fff;
-      font-size: 0.75rem;
-      font-weight: bold;
-      padding: 3px 8px;
-      border-radius: 4px;
-      letter-spacing: 0.05em;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
     }
-    h1 { font-size: 1.15rem; font-weight: 700; color: #f8fafc; }
-    .nav-links { display: flex; gap: 10px; }
-    .nav-links a {
-      color: #94a3b8;
-      text-decoration: none;
-      font-size: 0.85rem;
-      padding: 6px 12px;
+    .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
+    button, select {
+      background: #1f2937;
+      color: #f3f4f6;
+      border: 1px solid #374151;
+      padding: 4px 9px;
       border-radius: 6px;
-      background: #1e293b;
-      transition: 0.2s;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.15s, border-color 0.15s;
     }
-    .nav-links a:hover { background: #334155; color: #fff; }
+    button:hover, select:hover { background: #374151; }
+    button.primary { background: #2563eb; border-color: #3b82f6; }
+    button.primary:hover { background: #1d4ed8; }
+    button.danger { background: #dc2626; border-color: #ef4444; font-weight: 700; }
+    button.danger:hover { background: #b91c1c; }
+    button.warn-btn { background: #d97706; border-color: #f59e0b; font-weight: 700; }
+    button.warn-btn:hover { background: #b45309; }
+    button.success { background: #059669; border-color: #10b981; font-weight: 700; }
+    button.success:hover { background: #047857; }
+    button.active-tool { background: #2563eb; border-color: #60a5fa; font-weight: 700; box-shadow: 0 0 0 1px #60a5fa; }
 
-    .main-container {
-      display: flex;
+    .main-layout {
       flex: 1;
+      display: flex;
       position: relative;
       overflow: hidden;
+      min-height: 150px;
     }
-    canvas {
-      flex: 1;
-      display: block;
-      cursor: grab;
-      background: radial-gradient(circle at center, #111827 0%, #090d16 100%);
-    }
-    canvas:active { cursor: grabbing; }
+    #map { flex: 1; height: 100%; background: #0b0f19; }
 
-    .sidebar {
-      width: 320px;
-      background: rgba(15, 23, 42, 0.95);
-      border-left: 1px solid #1e293b;
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      overflow-y: auto;
-      z-index: 5;
+    .dark-map-tiles {
+      filter: invert(100%) hue-rotate(180deg) brightness(92%) contrast(92%);
     }
-    .card {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      padding: 14px;
+    .hd-photo-tiles {
+      filter: contrast(106%) saturate(108%);
     }
-    .card h2 {
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: #94a3b8;
-      margin-bottom: 10px;
-      border-bottom: 1px solid #334155;
-      padding-bottom: 6px;
-    }
-    .stat-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .stat-item {
-      background: #0f172a;
-      padding: 10px;
-      border-radius: 6px;
-    }
-    .stat-label { font-size: 0.75rem; color: #94a3b8; }
-    .stat-value { font-size: 1.2rem; font-weight: bold; color: #38bdf8; margin-top: 2px; }
-    .stat-value.warn { color: #f87171; }
 
-    .control-row {
+    /* 矢印リサイズバー */
+    .resizer-v {
+      width: 10px;
+      background: #1f2937;
+      border-left: 1px solid #374151;
+      border-right: 1px solid #374151;
+      cursor: ew-resize;
       display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-bottom: 10px;
+      align-items: center;
+      justify-content: center;
+      color: #9ca3af;
+      font-size: 11px;
+      z-index: 980;
     }
-    .control-row label {
-      font-size: 0.82rem;
-      color: #cbd5e1;
-      display: flex;
-      justify-content: space-between;
-    }
-    input[type="range"] { width: 100%; accent-color: #38bdf8; }
-    .btn-group { display: flex; gap: 8px; }
-    button {
-      flex: 1;
-      padding: 9px 12px;
-      border: none;
-      border-radius: 6px;
-      font-weight: bold;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-    .btn-primary { background: #0284c7; color: #fff; }
-    .btn-primary:hover { background: #0369a1; }
-    .btn-secondary { background: #334155; color: #f1f5f9; }
-    .btn-secondary:hover { background: #475569; }
+    .resizer-v:hover { background: #2563eb; color: #fff; }
 
-    .legend {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 0.8rem;
-    }
-    .legend-bar {
+    .resizer-h {
       height: 10px;
-      border-radius: 5px;
-      background: linear-gradient(90deg, #3b82f6 0%, #eab308 50%, #ef4444 100%);
-    }
-    .legend-labels {
+      background: #1f2937;
+      border-top: 1px solid #374151;
+      border-bottom: 1px solid #374151;
+      cursor: ns-resize;
       display: flex;
-      justify-content: space-between;
-      color: #94a3b8;
-      font-size: 0.72rem;
+      align-items: center;
+      justify-content: center;
+      color: #9ca3af;
+      font-size: 11px;
+      z-index: 980;
     }
-    .inspector-box {
-      font-size: 0.82rem;
-      line-height: 1.6;
-      color: #e2e8f0;
-      min-height: 85px;
-    }
-    .hint {
+    .resizer-h:hover { background: #2563eb; color: #fff; }
+
+    .mode-banner {
       position: absolute;
-      bottom: 14px;
-      left: 16px;
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid #334155;
-      padding: 8px 14px;
+      top: 10px;
+      left: 50px;
+      background: rgba(17, 24, 39, 0.93);
+      border: 1px solid #3b82f6;
+      color: #e2e8f0;
+      padding: 5px 12px;
       border-radius: 6px;
-      font-size: 0.78rem;
-      color: #94a3b8;
+      font-size: 12px;
+      z-index: 950;
       pointer-events: none;
     }
+
+    /* ズーム倍率インジケーター */
+    .zoom-badge {
+      position: absolute;
+      bottom: 24px;
+      left: 12px;
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid #374151;
+      color: #38bdf8;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      z-index: 950;
+      pointer-events: none;
+    }
+
+    /* Ctrl+ドラッグ範囲選択後の確認ダイアログ */
+    .selection-modal {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(17, 24, 39, 0.97);
+      border: 2px solid #3b82f6;
+      border-radius: 10px;
+      padding: 16px 20px;
+      z-index: 2000;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.75);
+      min-width: 330px;
+      text-align: center;
+    }
+    .selection-modal h4 { font-size: 14px; margin-bottom: 8px; color: #f8fafc; }
+    .selection-modal p { font-size: 12px; color: #cbd5e1; margin-bottom: 14px; line-height: 1.5; }
+    .modal-btns { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+
+    .side-panel {
+      width: 325px;
+      background: rgba(17, 24, 39, 0.96);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      z-index: 900;
+      overflow-y: auto;
+    }
+    .card {
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      padding: 9px;
+    }
+    .card h3 {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .kpi-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+    .kpi-box { background: #111827; padding: 6px; border-radius: 6px; }
+    .kpi-label { font-size: 10px; color: #9ca3af; }
+    .kpi-val { font-size: 15px; font-weight: 700; color: #38bdf8; margin-top: 2px; }
+    .kpi-val.warn { color: #f59e0b; }
+
+    .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+
+    /* カラーレイヤー選択ボタン */
+    .color-palette { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .color-chip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 7px;
+      border-radius: 5px;
+      border: 1px solid #4b5563;
+      background: #111827;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .color-chip.selected { border: 2px solid #ffffff; background: #1e293b; font-weight: 700; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+    .inspector-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+    .bottom-charts {
+      height: 175px;
+      background: #111827;
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 10px;
+      padding: 8px 14px;
+      z-index: 950;
+    }
+    .chart-box {
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      padding: 5px;
+      overflow: hidden;
+    }
+    #speedChart, #bottleneckChart { width: 100%; height: 100%; }
   </style>
 </head>
 <body>
   <header>
-    <div class="title-group">
-      <span class="badge">DIGITAL TWIN v1.0</span>
-      <h1>キャンパス周辺 実道路ネットワーク交通管制システム</h1>
+    <div class="title-area">
+      <strong>Digital Twin Traffic Control</strong>
+      <span class="badge">v2.3 Ultra-Zoom & Layer Net</span>
+      <span id="locationLabel" style="font-size:12px; color:#9ca3af;">Loading...</span>
     </div>
-    <div class="nav-links">
-      <a href="/index.html">🎮 従来シミュレーター</a>
-      <a href="/dashboard.html">📊 サーバー監視</a>
-      <a href="/api/real-map" target="_blank">📄 Raw JSON</a>
+
+    <div class="controls">
+      <!-- 高精細航空写真・地図スタイル切替 -->
+      <select id="mapStyleSelect" onchange="switchMapStyle(this.value)">
+        <option value="esri_hd" selected>航空写真: Esri 超高精細衛星 (Zoom 22)</option>
+        <option value="gsi_photo">航空写真: 国土地理院 最新写真 (Zoom 22)</option>
+        <option value="gsi_std">リアル地図: 国土地理院 標準</option>
+        <option value="osm_real">リアル地図: OpenStreetMap</option>
+        <option value="dark">地図: ダーク管制モード</option>
+      </select>
+
+      <select id="trafficModeSelect" onchange="changeTrafficMode(this.value)">
+        <option value="random">シナリオ: 通常分散巡回</option>
+        <option value="rush">シナリオ: 中央エリア集中ラッシュ</option>
+      </select>
+
+      <span>車両: <strong id="vehCountDisplay">80</strong>台</span>
+      <button onclick="changeVehicleCount(-20)">-20</button>
+      <button onclick="changeVehicleCount(20)">+20</button>
+      <button class="primary" id="toggleBtn" onclick="toggleSimulation()">一時停止</button>
     </div>
   </header>
 
-  <div class="main-container">
-    <canvas id="mapCanvas"></canvas>
-    <div class="hint">🖱️ ドラッグで移動 / ホイールで拡大・縮小 / 道路や交差点にカーソルを合わせて詳細表示</div>
+  <div class="main-layout">
+    <div id="map"></div>
 
-    <aside class="sidebar">
+    <div class="mode-banner" id="modeBanner">
+      操作ヒント: <strong>Ctrl＋ドラッグ</strong>で範囲一括封鎖・削除 ／ ホイールで<strong>超拡大 (Zoom 22)</strong>
+    </div>
+    <div class="zoom-badge" id="zoomBadge">Zoom: 16 / 22</div>
+
+    <!-- Ctrl+ドラッグ範囲選択時の確認ダイアログ -->
+    <div class="selection-modal" id="selectionModal">
+      <h4>範囲選択された要素の一括操作</h4>
+      <p id="selectionModalText">選択範囲内に 0 本の道路と 0 個のノードが見つかりました。</p>
+      <div class="modal-btns">
+        <button class="warn-btn" onclick="applyAreaAction('block')">一括通行止め</button>
+        <button class="success" onclick="applyAreaAction('unblock')">通行止め解除</button>
+        <button class="danger" onclick="applyAreaAction('delete')">範囲内を一括削除</button>
+        <button onclick="closeSelectionModal()">キャンセル</button>
+      </div>
+    </div>
+
+    <!-- 左右リサイズ矢印ハンドル -->
+    <div class="resizer-v" id="vResizer" title="左右にドラッグしてマップ幅を調整">↔</div>
+
+    <aside class="side-panel" id="sidePanel">
       <div class="card">
-        <h2>ネットワーク統計 (OSM実データ)</h2>
-        <div class="stat-grid">
-          <div class="stat-item">
-            <div class="stat-label">交差点ノード数</div>
-            <div class="stat-value" id="nodeCount">-</div>
+        <h3>リアルタイム交通工学KPI（IDM実測）</h3>
+        <div class="kpi-grid">
+          <div class="kpi-box">
+            <div class="kpi-label">空間平均速度</div>
+            <div class="kpi-val" id="avgSpeedKpi">-- km/h</div>
           </div>
-          <div class="stat-item">
-            <div class="stat-label">道路エッジ数</div>
-            <div class="stat-value" id="edgeCount">-</div>
+          <div class="kpi-box">
+            <div class="kpi-label">渋滞車両数</div>
+            <div class="kpi-val warn" id="jamCountKpi">0 台</div>
           </div>
-          <div class="stat-item">
-            <div class="stat-label">稼働車両エージェント</div>
-            <div class="stat-value" id="activeCars">0</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">Goサーバー混雑指数</div>
-            <div class="stat-value warn" id="serverCongestion">-</div>
+          <div class="kpi-box">
+            <div class="kpi-label">平均迂回率</div>
+            <div class="kpi-val" id="detourRatioKpi">1.00x</div>
           </div>
         </div>
       </div>
 
       <div class="card">
-        <h2>ボトルネックヒートマップ (媒介中心性)</h2>
-        <div class="legend">
-          <div class="legend-bar"></div>
-          <div class="legend-labels">
-            <span>低 (迂回路)</span>
-            <span>中 (幹線)</span>
-            <span>高 (ボトルネック)</span>
+        <h3>ネットワーク編集・構築ツール</h3>
+        <div class="tool-grid">
+          <button id="toolSelect" class="active-tool" onclick="setEditTool('select')">選択・編集</button>
+          <button id="toolAddNode" onclick="setEditTool('addNode')">＋ ノード追加</button>
+          <button id="toolAddEdge" onclick="setEditTool('addEdge')">＋ 道路接続</button>
+          <button id="toolDelete" onclick="setEditTool('delete')">削除 (消しゴム)</button>
+        </div>
+
+        <div style="font-size:11px; color:#cbd5e1; margin-top:8px;">
+          <strong>追加・変更する色（通行レイヤー指定）：</strong>
+        </div>
+        <div class="color-palette" id="colorPalette">
+          <div class="color-chip selected" data-color="#38bdf8" onclick="selectLayerColor('#38bdf8', this)">
+            <span class="dot" style="background:#38bdf8;"></span>一般車道(40k)
           </div>
-          <label style="margin-top:6px; display:flex; align-items:center; gap:6px; cursor:pointer;">
-            <input type="checkbox" id="toggleHeatmap" checked />
-            <span>媒介中心性ヒートマップを有効化</span>
-          </label>
-          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-            <input type="checkbox" id="toggleNodes" checked />
-            <span>交差点ノードを表示</span>
-          </label>
+          <div class="color-chip" data-color="#f97316" onclick="selectLayerColor('#f97316', this)">
+            <span class="dot" style="background:#f97316;"></span>幹線(55k)
+          </div>
+          <div class="color-chip" data-color="#a855f7" onclick="selectLayerColor('#a855f7', this)">
+            <span class="dot" style="background:#a855f7;"></span>特設バイパス(50k)
+          </div>
+          <div class="color-chip" data-color="#eab308" onclick="selectLayerColor('#eab308', this)">
+            <span class="dot" style="background:#eab308;"></span>徐行路(20k)
+          </div>
+          <div class="color-chip" data-color="#22c55e" onclick="selectLayerColor('#22c55e', this)">
+            <span class="dot" style="background:#22c55e;"></span>歩行者専用(車不可)
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+          <span id="editStatus" style="font-size:11px; color:#93c5fd;">封鎖: 0 / 追加: 0</span>
+          <button onclick="exportCustomGraph()" style="padding:3px 8px;">JSON保存</button>
         </div>
       </div>
 
       <div class="card">
-        <h2>マルチエージェント交通流シミュレーション</h2>
-        <div class="control-row">
-          <label>
-            <span>流入車両台数</span>
-            <span id="carCountLabel">40 台</span>
-          </label>
-          <input type="range" id="carSlider" min="5" max="150" value="40" />
-        </div>
-        <div class="btn-group">
-          <button class="btn-primary" id="toggleSimBtn">⏸ 一時停止</button>
-          <button class="btn-secondary" id="resetViewBtn">🎯 全体表示</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>道路・交差点インスペクター</h2>
-        <div class="inspector-box" id="inspector">
-          地図上の道路または交差点にマウスカーソルを合わせると、道路種別・区間長・ボトルネック指数が表示されます。
+        <h3>選択オブジェクト・インスペクター</h3>
+        <div id="inspectorContent" style="font-size:12px; line-height:1.5; color:#cbd5e1;">
+          地図上の<strong>ノード（丸印）</strong>または<strong>道路</strong>をクリックすると、色の変更・通行止め・削除ができます。
         </div>
       </div>
     </aside>
   </div>
 
+  <!-- 上下リサイズ矢印ハンドル -->
+  <div class="resizer-h" id="hResizer" title="上下にドラッグしてマップ高さを調整">↕</div>
+
+  <section class="bottom-charts" id="bottomCharts">
+    <div class="chart-box"><div id="speedChart"></div></div>
+    <div class="chart-box"><div id="bottleneckChart"></div></div>
+  </section>
+
   <script>
-    const canvas = document.getElementById("mapCanvas");
-    const ctx = canvas.getContext("2d");
-
+    let map, currentTileLayer, vehicleLayer, nodeLayer, edgeLayer;
     let nodesMap = new Map();
-    let edges = [];
-    let adjacency = new Map();
-    let maxCentrality = 0.0001;
-
-    // 描画カメラパラメータ
-    let bounds = { minX: 0, maxX: 1, minY: 0, maxY: 1 };
-    let camera = { offsetX: 0, offsetY: 0, scale: 1 };
-    let isDragging = false;
-    let dragStart = { x: 0, y: 0 };
-    let hoveredItem = null;
-
-    // シミュレーション用車両エージェント
+    let edgesList = [];
     let vehicles = [];
-    let isSimRunning = true;
-    let targetCarCount = 40;
+    let targetVehicleCount = 80;
+    let isRunning = true;
+    let trafficMode = "random";
+    let centerCoord = { lat: 35.687, lon: 139.327 };
 
-    function resizeCanvas() {
-      canvas.width = canvas.clientWidth;
-      canvas.height = canvas.clientHeight;
-    }
-    window.addEventListener("resize", () => {
-      resizeCanvas();
-      fitMapToScreen();
-    });
+    // 編集・選択状態
+    let editTool = "select"; // 'select' | 'addNode' | 'addEdge' | 'delete'
+    let activeLayerColor = "#38bdf8";
+    let selectedFirstNode = null;
+    let inspectedTarget = null; // { type: 'node'|'edge', obj }
+    let customNodeCounter = 1;
 
-    // 緯度経度からキャンバス基準座標への変換
-    function geoToWorld(lon, lat) {
-      const cosLat = Math.cos(((bounds.minY + bounds.maxY) / 2) * Math.PI / 180);
-      return {
-        x: (lon - bounds.minX) * cosLat,
-        y: (bounds.maxY - lat)
-      };
-    }
-
-    function worldToScreen(wx, wy) {
-      return {
-        x: wx * camera.scale + camera.offsetX,
-        y: wy * camera.scale + camera.offsetY
-      };
-    }
-
-    function fitMapToScreen() {
-      const p1 = geoToWorld(bounds.minX, bounds.maxY);
-      const p2 = geoToWorld(bounds.maxX, bounds.minY);
-      const worldW = Math.max(p2.x - p1.x, 1e-6);
-      const worldH = Math.max(p2.y - p1.y, 1e-6);
-
-      const padding = 50;
-      const scaleX = (canvas.width - padding * 2) / worldW;
-      const scaleY = (canvas.height - padding * 2) / worldH;
-      camera.scale = Math.min(scaleX, scaleY);
-
-      camera.offsetX = (canvas.width - worldW * camera.scale) / 2;
-      camera.offsetY = (canvas.height - worldH * camera.scale) / 2;
-    }
-
-    // ボトルネック度に応じたヒートマップカラー
-    function getHeatColor(ratio) {
-      const r = Math.min(1, Math.max(0, ratio));
-      if (r < 0.5) {
-        const t = r * 2;
-        const red = Math.round(59 + (234 - 59) * t);
-        const green = Math.round(130 + (179 - 130) * t);
-        const blue = Math.round(246 + (8 - 246) * t);
-        return `rgb(${red},${green},${blue})`;
-      } else {
-        const t = (r - 0.5) * 2;
-        const red = Math.round(234 + (239 - 234) * t);
-        const green = Math.round(179 + (68 - 179) * t);
-        const blue = Math.round(8 + (68 - 8) * t);
-        return `rgb(${red},${green},${blue})`;
-      }
-    }
-
-    // 地図データの読み込みと正規化
-    async function loadRealMap() {
-      try {
-        const res = await fetch("/api/real-map");
-        const raw = await res.json();
-
-        let minLon = Infinity, maxLon = -Infinity;
-        let minLat = Infinity, maxLat = -Infinity;
-
-        const rawNodes = Array.isArray(raw.nodes)
-          ? raw.nodes
-          : Object.entries(raw.nodes || {}).map(([id, val]) => ({ id, ...val }));
-
-        rawNodes.forEach(n => {
-          const id = String(n.id);
-          const lon = Number(n.x ?? n.lon ?? n.lng);
-          const lat = Number(n.y ?? n.lat);
-          if (!isNaN(lon) && !isNaN(lat)) {
-            nodesMap.set(id, { id, lon, lat });
-            adjacency.set(id, []);
-            if (lon < minLon) minLon = lon;
-            if (lon > maxLon) maxLon = lon;
-            if (lat < minLat) minLat = lat;
-            if (lat > maxLat) maxLat = lat;
-          }
-        });
-
-        bounds = { minX: minLon, maxX: maxLon, minY: minLat, maxY: maxLat };
-
-        const rawEdges = raw.links || raw.edges || [];
-        rawEdges.forEach(e => {
-          const src = String(e.source ?? e.from);
-          const dst = String(e.target ?? e.to);
-          if (nodesMap.has(src) && nodesMap.has(dst)) {
-            const c = Number(e.centrality || 0);
-            if (c > maxCentrality) maxCentrality = c;
-            const edgeObj = {
-              source: src,
-              target: dst,
-              centrality: c,
-              length: Number(e.length || 30),
-              highway: Array.isArray(e.highway) ? e.highway.join("/") : (e.highway || "road")
-            };
-            edges.push(edgeObj);
-            adjacency.get(src).push(edgeObj);
-          }
-        });
-
-        document.getElementById("nodeCount").textContent = nodesMap.size.toLocaleString();
-        document.getElementById("edgeCount").textContent = edges.length.toLocaleString();
-
-        resizeCanvas();
-        fitMapToScreen();
-        spawnVehicles(targetCarCount);
-        requestAnimationFrame(renderLoop);
-      } catch (err) {
-        console.error("地図読み込みエラー:", err);
-        document.getElementById("inspector").textContent = "地図データの読み込みに失敗しました。Goサーバーが起動しているか確認してください。";
-      }
-    }
-
-    // 車両エージェントの生成
-    function spawnVehicles(count) {
-      const nodeIds = Array.from(nodesMap.keys());
-      if (nodeIds.length === 0) return;
-
-      while (vehicles.length < count) {
-        const startId = nodeIds[Math.floor(Math.random() * nodeIds.length)];
-        const outEdges = adjacency.get(startId);
-        if (outEdges && outEdges.length > 0) {
-          const edge = outEdges[Math.floor(Math.random() * outEdges.length)];
-          vehicles.push({
-            edge,
-            progress: Math.random(),
-            speedFactor: 0.7 + Math.random() * 0.6,
-            isEmergency: Math.random() < 0.08
-          });
-        }
-      }
-      if (vehicles.length > count) {
-        vehicles.length = count;
-      }
-      document.getElementById("activeCars").textContent = vehicles.length;
-    }
-
-    function updateVehicles() {
-      if (!isSimRunning) return;
-      const nodeIds = Array.from(nodesMap.keys());
-
-      vehicles.forEach(v => {
-        const congestionSlowdown = 1 - 0.55 * (v.edge.centrality / maxCentrality);
-        const step = (1.8 * v.speedFactor * congestionSlowdown) / Math.max(v.edge.length, 15);
-        v.progress += step;
-
-        if (v.progress >= 1) {
-          v.progress = 0;
-          const nextEdges = adjacency.get(v.edge.target);
-          if (nextEdges && nextEdges.length > 0) {
-            v.edge = nextEdges[Math.floor(Math.random() * nextEdges.length)];
-          } else {
-            const randomId = nodeIds[Math.floor(Math.random() * nodeIds.length)];
-            const restartEdges = adjacency.get(randomId);
-            if (restartEdges && restartEdges.length > 0) {
-              v.edge = restartEdges[0];
-            }
-          }
-        }
-      });
-    }
-
-    function renderLoop() {
-      updateVehicles();
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const showHeatmap = document.getElementById("toggleHeatmap").checked;
-      const showNodes = document.getElementById("toggleNodes").checked;
-
-      // 1. 道路エッジの描画
-      edges.forEach(e => {
-        const n1 = nodesMap.get(e.source);
-        const n2 = nodesMap.get(e.target);
-        const w1 = geoToWorld(n1.lon, n1.lat);
-        const w2 = geoToWorld(n2.lon, n2.lat);
-        const s1 = worldToScreen(w1.x, w1.y);
-        const s2 = worldToScreen(w2.x, w2.y);
-
-        const ratio = e.centrality / maxCentrality;
-        const isHovered = hoveredItem && hoveredItem.type === "edge" && hoveredItem.data === e;
-
-        ctx.beginPath();
-        ctx.moveTo(s1.x, s1.y);
-        ctx.lineTo(s2.x, s2.y);
-
-        if (isHovered) {
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 6;
-        } else if (showHeatmap) {
-          ctx.strokeStyle = getHeatColor(ratio);
-          ctx.lineWidth = 1.5 + ratio * 4.5;
-        } else {
-          ctx.strokeStyle = "#334155";
-          ctx.lineWidth = 2;
-        }
-        ctx.stroke();
-      });
-
-      // 2. 交差点ノードの描画
-      if (showNodes) {
-        nodesMap.forEach(n => {
-          const w = geoToWorld(n.lon, n.lat);
-          const s = worldToScreen(w.x, w.y);
-          if (s.x < -10 || s.x > canvas.width + 10 || s.y < -10 || s.y > canvas.height + 10) return;
-
-          const isHovered = hoveredItem && hoveredItem.type === "node" && hoveredItem.data === n;
-          ctx.beginPath();
-          ctx.arc(s.x, s.y, isHovered ? 5.5 : 2.2, 0, Math.PI * 2);
-          ctx.fillStyle = isHovered ? "#38bdf8" : "rgba(148, 163, 184, 0.55)";
-          ctx.fill();
-        });
-      }
-
-      // 3. 車両エージェントの描画
-      vehicles.forEach(v => {
-        const n1 = nodesMap.get(v.edge.source);
-        const n2 = nodesMap.get(v.edge.target);
-        const lon = n1.lon + (n2.lon - n1.lon) * v.progress;
-        const lat = n1.lat + (n2.lat - n1.lat) * v.progress;
-        const w = geoToWorld(lon, lat);
-        const s = worldToScreen(w.x, w.y);
-
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, v.isEmergency ? 4.2 : 3.2, 0, Math.PI * 2);
-        ctx.fillStyle = v.isEmergency ? "#f43f5e" : "#38bdf8";
-        ctx.fill();
-
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, v.isEmergency ? 7 : 5, 0, Math.PI * 2);
-        ctx.fillStyle = v.isEmergency ? "rgba(244, 63, 94, 0.25)" : "rgba(56, 189, 248, 0.25)";
-        ctx.fill();
-      });
-
-      requestAnimationFrame(renderLoop);
-    }
-
-    // マウス操作（パン・ズーム・インスペクター）
-    canvas.addEventListener("mousedown", e => {
-      isDragging = true;
-      dragStart = { x: e.clientX - camera.offsetX, y: e.clientY - camera.offsetY };
-    });
-
-    window.addEventListener("mouseup", () => {
-      isDragging = false;
-    });
-
-    canvas.addEventListener("mousemove", e => {
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-
-      if (isDragging) {
-        camera.offsetX = e.clientX - dragStart.x;
-        camera.offsetY = e.clientY - dragStart.y;
-        return;
-      }
-
-      let found = null;
-      let minDist = 10;
-
-      nodesMap.forEach(n => {
-        const w = geoToWorld(n.lon, n.lat);
-        const s = worldToScreen(w.x, w.y);
-        const d = Math.hypot(s.x - mx, s.y - my);
-        if (d < 8 && d < minDist) {
-          minDist = d;
-          found = { type: "node", data: n };
-        }
-      });
-
-      if (!found) {
-        edges.forEach(edge => {
-          const n1 = nodesMap.get(edge.source);
-          const n2 = nodesMap.get(edge.target);
-          const w1 = geoToWorld(n1.lon, n1.lat);
-          const w2 = geoToWorld(n2.lon, n2.lat);
-          const s1 = worldToScreen(w1.x, w1.y);
-          const s2 = worldToScreen(w2.x, w2.y);
-
-          const dist = pointToSegmentDist(mx, my, s1.x, s1.y, s2.x, s2.y);
-          if (dist < 7 && dist < minDist) {
-            minDist = dist;
-            found = { type: "edge", data: edge };
-          }
-        });
-      }
-
-      hoveredItem = found;
-      const inspector = document.getElementById("inspector");
-      if (found && found.type === "node") {
-        inspector.innerHTML = `
-          <strong>📍 交差点ノード</strong><br>
-          ID: <code>${found.data.id}</code><br>
-          接続道路数: ${(adjacency.get(found.data.id) || []).length} 本
-        `;
-      } else if (found && found.type === "edge") {
-        const ratioPct = ((found.data.centrality / maxCentrality) * 100).toFixed(1);
-        inspector.innerHTML = `
-          <strong>🛣️ 道路セグメント</strong><br>
-          種別: <b>${found.data.highway}</b><br>
-          区間距離: ${found.data.length.toFixed(1)} m<br>
-          ボトルネック指数: <b style="color:#f87171">${found.data.centrality.toFixed(4)}</b> (相対負荷 ${ratioPct}%)
-        `;
-      }
-    });
-
-    canvas.addEventListener("wheel", e => {
-      e.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-
-      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-      camera.offsetX = mx - (mx - camera.offsetX) * zoomFactor;
-      camera.offsetY = my - (my - camera.offsetY) * zoomFactor;
-      camera.scale *= zoomFactor;
-    }, { passive: false });
-
-    function pointToSegmentDist(px, py, x1, y1, x2, y2) {
-      const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
-      if (l2 === 0) return Math.hypot(px - x1, py - y1);
-      let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
-      t = Math.max(0, Math.min(1, t));
-      return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
-    }
-
-    document.getElementById("carSlider").addEventListener("input", e => {
-      targetCarCount = Number(e.target.value);
-      document.getElementById("carCountLabel").textContent = `${targetCarCount} 台`;
-      spawnVehicles(targetCarCount);
-    });
-
-    document.getElementById("toggleSimBtn").addEventListener("click", e => {
-      isSimRunning = !isSimRunning;
-      e.target.textContent = isSimRunning ? "⏸ 一時停止" : "▶ 再生再開";
-    });
-
-    document.getElementById("resetViewBtn").addEventListener("click", fitMapToScreen);
-
-    const evtSource = new EventSource("/api/stream");
-    evtSource.onmessage = event => {
-      const state = JSON.parse(event.data);
-      document.getElementById("serverCongestion").textContent = `${state.congestion}%`;
+    // 色（レイヤー）ごとの通行ルールと制限速度定義
+    const LAYER_RULES = {
+      "#38bdf8": { name: "一般車道", drivable: true, speedKmh: 40 },
+      "#f97316": { name: "幹線道路", drivable: true, speedKmh: 55 },
+      "#a855f7": { name: "特設バイパス", drivable: true, speedKmh: 50 },
+      "#eab308": { name: "徐行ルート", drivable: true, speedKmh: 20 },
+      "#22c55e": { name: "歩行者専用(車両不可)", drivable: false, speedKmh: 0 }
     };
 
-    loadRealMap();
+    // Ctrl + ドラッグ範囲選択用
+    let isCtrlDown = false;
+    let isBoxSelecting = false;
+    let boxStartLatLng = null;
+    let selectionRect = null;
+    let pendingEdges = [];
+    let pendingNodes = [];
+
+    let speedChart, bottleneckChart;
+    let timeLabels = [];
+    let speedHistory = [];
+    let jamHistory = [];
+
+    function pick(obj, keys) {
+      for (const k of keys) {
+        if (obj && obj[k] !== undefined && obj[k] !== null) return obj[k];
+      }
+      return undefined;
+    }
+
+    function haversineMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const toRad = d => d * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function getDefaultColorByCentrality(centrality) {
+      if (centrality > 0.06) return "#f97316";
+      if (centrality > 0.02) return "#eab308";
+      return "#38bdf8";
+    }
+
+    function isNodeDrivable(node) {
+      const rule = LAYER_RULES[node.color] || LAYER_RULES["#38bdf8"];
+      return rule.drivable;
+    }
+
+    function isEdgeDrivable(edge) {
+      if (edge.blocked) return false;
+      const rule = LAYER_RULES[edge.color] || LAYER_RULES["#38bdf8"];
+      if (!rule.drivable) return false;
+      return isNodeDrivable(edge.n1) && isNodeDrivable(edge.n2);
+    }
+
+    function getEdgeSpeedMs(edge) {
+      const rule = LAYER_RULES[edge.color] || LAYER_RULES["#38bdf8"];
+      return (rule.speedKmh || 40) / 3.6;
+    }
+
+    // 1. 高精細航空写真＆オーバーズーム対応（最大Zoom 22まで拡大可能）
+    function switchMapStyle(style) {
+      if (currentTileLayer) {
+        map.removeLayer(currentTileLayer);
+        currentTileLayer = null;
+      }
+      if (style === "esri_hd") {
+        // Esri World Imagery: ネイティブZoom 19の高精細衛星写真をZoom 22まで拡大表示
+        currentTileLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+          attribution: "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics",
+          maxNativeZoom: 19,
+          maxZoom: 22,
+          className: "hd-photo-tiles"
+        }).addTo(map);
+      } else if (style === "gsi_photo") {
+        // 国土地理院 シームレス空中写真: ネイティブZoom 18をZoom 22まで拡大表示
+        currentTileLayer = L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg", {
+          attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>国土地理院</a>",
+          maxNativeZoom: 18,
+          maxZoom: 22,
+          className: "hd-photo-tiles"
+        }).addTo(map);
+      } else if (style === "gsi_std") {
+        currentTileLayer = L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png", {
+          attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>国土地理院</a>",
+          maxNativeZoom: 18,
+          maxZoom: 22
+        }).addTo(map);
+      } else if (style === "osm_real") {
+        currentTileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "&copy; OpenStreetMap contributors",
+          maxNativeZoom: 19,
+          maxZoom: 22
+        }).addTo(map);
+      } else if (style === "dark") {
+        currentTileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "&copy; OpenStreetMap contributors",
+          maxNativeZoom: 19,
+          maxZoom: 22,
+          className: "dark-map-tiles"
+        }).addTo(map);
+      }
+    }
+
+    function selectLayerColor(hexColor, el) {
+      activeLayerColor = hexColor;
+      document.querySelectorAll(".color-chip").forEach(c => c.classList.remove("selected"));
+      if (el) el.classList.add("selected");
+    }
+
+    function setEditTool(tool) {
+      editTool = tool;
+      selectedFirstNode = null;
+      ["toolSelect", "toolAddNode", "toolAddEdge", "toolDelete"].forEach(id => {
+        document.getElementById(id).classList.remove("active-tool");
+      });
+      if (tool === "select") document.getElementById("toolSelect").classList.add("active-tool");
+      if (tool === "addNode") document.getElementById("toolAddNode").classList.add("active-tool");
+      if (tool === "addEdge") document.getElementById("toolAddEdge").classList.add("active-tool");
+      if (tool === "delete") document.getElementById("toolDelete").classList.add("active-tool");
+
+      const banner = document.getElementById("modeBanner");
+      if (tool === "select") {
+        banner.innerHTML = "モード: <strong>選択・編集</strong>（ノード/道路クリックで色変更・封鎖・削除 ／ <strong>Ctrl+ドラッグ</strong>で一括操作）";
+      } else if (tool === "addNode") {
+        banner.innerHTML = "モード: <strong>＋ノード追加</strong>（地図上の好きな場所をクリックすると選択中の色で交差点を設置）";
+      } else if (tool === "addEdge") {
+        banner.innerHTML = "モード: <strong>＋道路接続</strong>（1つ目のノードをクリック → 2つ目のノードをクリックで道路開通）";
+      } else if (tool === "delete") {
+        banner.innerHTML = "モード: <strong>削除（消しゴム）</strong>（クリックしたノードまたは道路を即座に削除します）";
+      }
+    }
+
+    function updateStatusBar() {
+      const blocked = edgesList.filter(e => e.blocked).length;
+      const custom = nodesMap.size;
+      document.getElementById("editStatus").textContent = `封鎖: ${blocked}区間 / 総ノード: ${custom}`;
+      document.getElementById("locationLabel").textContent =
+        `Event Area (${nodesMap.size} nodes / ${edgesList.length} edges)`;
+    }
+
+    // ノード削除処理（接続されている道路も安全に同時削除）
+    function deleteNodeById(nodeId) {
+      const node = nodesMap.get(nodeId);
+      if (!node) return;
+      if (node.marker) nodeLayer.removeLayer(node.marker);
+      nodesMap.delete(nodeId);
+
+      // このノードに接続している全エッジを削除
+      const remainingEdges = [];
+      edgesList.forEach(e => {
+        if (e.u === nodeId || e.v === nodeId) {
+          if (e.poly) edgeLayer.removeLayer(e.poly);
+        } else {
+          remainingEdges.push(e);
+        }
+      });
+      edgesList = remainingEdges;
+
+      if (inspectedTarget && inspectedTarget.obj && inspectedTarget.obj.id === nodeId) {
+        inspectedTarget = null;
+        document.getElementById("inspectorContent").innerHTML = "ノードを削除しました。";
+      }
+      updateStatusBar();
+      validateAndRerouteVehicles();
+    }
+
+    // 道路（エッジ）削除処理
+    function deleteEdgeByObj(edgeObj) {
+      if (edgeObj.poly) edgeLayer.removeLayer(edgeObj.poly);
+      edgesList = edgesList.filter(e => e !== edgeObj);
+      if (inspectedTarget && inspectedTarget.obj === edgeObj) {
+        inspectedTarget = null;
+        document.getElementById("inspectorContent").innerHTML = "道路を削除しました。";
+      }
+      updateStatusBar();
+      validateAndRerouteVehicles();
+    }
+
+    // インスペクター表示と操作ボタン
+    function showInspector(type, obj) {
+      inspectedTarget = { type, obj };
+      const rule = LAYER_RULES[obj.color] || LAYER_RULES["#38bdf8"];
+
+      const colorButtonsHtml = Object.entries(LAYER_RULES).map(([hex, info]) => `
+        <button onclick="changeInspectedColor('${hex}')" style="border-left: 5px solid ${hex}; padding:3px 6px; font-size:11px;">
+          ${info.name.split("(")[0]}
+        </button>
+      `).join("");
+
+      if (type === "node") {
+        document.getElementById("inspectorContent").innerHTML = `
+          <div><strong>選択ノードID:</strong> ${obj.id}</div>
+          <div><strong>現在のレイヤー:</strong> <span style="color:${obj.color}; font-weight:700;">● ${rule.name}</span></div>
+          <div><strong>座標:</strong> ${obj.lat.toFixed(6)}, ${obj.lon.toFixed(6)}</div>
+          <div style="margin-top:6px; font-size:11px; color:#9ca3af;">ノードの色（通行種別）を変更:</div>
+          <div class="inspector-actions">${colorButtonsHtml}</div>
+          <div class="inspector-actions">
+            <button class="danger" onclick="deleteNodeById('${obj.id}')">このノードを削除</button>
+          </div>
+        `;
+      } else {
+        const idx = edgesList.indexOf(obj);
+        document.getElementById("inspectorContent").innerHTML = `
+          <div><strong>道路名:</strong> ${obj.name} ${obj.blocked ? '<span style="color:#ef4444;">[通行止め]</span>' : ''}</div>
+          <div><strong>レイヤー種別:</strong> <span style="color:${obj.color}; font-weight:700;">■ ${rule.name}</span></div>
+          <div><strong>区間距離:</strong> ${obj.dist.toFixed(1)} m / <strong>通過台数:</strong> ${obj.passCount || 0}台</div>
+          <div style="margin-top:6px; font-size:11px; color:#9ca3af;">道路の色（通行種別）を変更:</div>
+          <div class="inspector-actions">${colorButtonsHtml}</div>
+          <div class="inspector-actions">
+            <button class="warn-btn" onclick="toggleEdgeBlockByIndex(${idx})">${obj.blocked ? "通行止め解除" : "通行止めにする"}</button>
+            <button class="danger" onclick="deleteEdgeByIndex(${idx})">この道路を削除</button>
+          </div>
+        `;
+      }
+    }
+
+    function changeInspectedColor(newHex) {
+      if (!inspectedTarget) return;
+      const { type, obj } = inspectedTarget;
+      obj.color = newHex;
+      if (type === "node" && obj.marker) {
+        obj.marker.setStyle({ fillColor: newHex, radius: 6.5 });
+      } else if (type === "edge" && obj.poly) {
+        obj.poly.setStyle({ color: obj.blocked ? "#dc2626" : newHex });
+      }
+      showInspector(type, obj);
+      validateAndRerouteVehicles();
+    }
+
+    function toggleEdgeBlockByIndex(idx) {
+      const edge = edgesList[idx];
+      if (!edge) return;
+      edge.blocked = !edge.blocked;
+      edge.poly.setStyle({
+        color: edge.blocked ? "#dc2626" : edge.color,
+        dashArray: edge.blocked ? "6, 6" : null
+      });
+      updateStatusBar();
+      showInspector("edge", edge);
+      validateAndRerouteVehicles();
+    }
+
+    function deleteEdgeByIndex(idx) {
+      const edge = edgesList[idx];
+      if (edge) deleteEdgeByObj(edge);
+    }
+
+    function registerNodeMarker(nodeObj) {
+      const marker = L.circleMarker([nodeObj.lat, nodeObj.lon], {
+        radius: nodeObj.isCustom ? 6 : 4,
+        fillColor: nodeObj.color,
+        color: "#0f172a",
+        weight: 1.5,
+        fillOpacity: nodeObj.isCustom ? 0.95 : 0.75
+      }).addTo(nodeLayer);
+      nodeObj.marker = marker;
+
+      marker.on("mouseover", () => {
+        marker.setStyle({ radius: 8, color: "#ffffff" });
+      });
+      marker.on("mouseout", () => {
+        marker.setStyle({ radius: nodeObj.isCustom ? 6 : 4, color: "#0f172a" });
+      });
+
+      marker.on("click", (ev) => {
+        if (isCtrlDown || isBoxSelecting) return;
+        L.DomEvent.stopPropagation(ev);
+
+        if (editTool === "delete") {
+          deleteNodeById(nodeObj.id);
+          return;
+        }
+        if (editTool === "select") {
+          showInspector("node", nodeObj);
+          return;
+        }
+        if (editTool === "addEdge") {
+          if (!selectedFirstNode) {
+            selectedFirstNode = nodeObj;
+            document.getElementById("modeBanner").innerHTML =
+              `モード: <strong>＋道路接続</strong>（始点 <code>${nodeObj.id}</code> 選択中 → 接続先の2つ目のノードをクリック）`;
+          } else if (selectedFirstNode.id !== nodeObj.id) {
+            addCustomEdge(selectedFirstNode, nodeObj, activeLayerColor);
+            selectedFirstNode = null;
+            document.getElementById("modeBanner").innerHTML =
+              "モード: <strong>＋道路接続</strong>（道路を開通させました！続けて別のノードも接続できます）";
+          }
+        }
+      });
+    }
+
+    function addCustomEdge(n1, n2, colorHex) {
+      const dist = Math.max(haversineMeters(n1.lat, n1.lon, n2.lat, n2.lon), 5);
+      const edgeObj = {
+        id: edgesList.length,
+        u: n1.id,
+        v: n2.id,
+        n1,
+        n2,
+        dist,
+        color: colorHex,
+        centrality: 0.05,
+        name: `新設ルート (${(LAYER_RULES[colorHex] || {}).name || "車道"})`,
+        blocked: false,
+        isCustom: true,
+        passCount: 0,
+        congestionScore: 0,
+        poly: null
+      };
+      edgesList.push(edgeObj);
+      drawEdgePolyline(edgeObj);
+      updateStatusBar();
+      validateAndRerouteVehicles();
+    }
+
+    function drawEdgePolyline(edgeObj) {
+      const poly = L.polyline([[edgeObj.n1.lat, edgeObj.n1.lon], [edgeObj.n2.lat, edgeObj.n2.lon]], {
+        color: edgeObj.blocked ? "#dc2626" : edgeObj.color,
+        weight: edgeObj.isCustom ? 4.8 : (edgeObj.color === "#f97316" ? 4.5 : 2.8),
+        opacity: 0.9,
+        dashArray: edgeObj.blocked ? "6, 6" : null
+      }).addTo(edgeLayer);
+      edgeObj.poly = poly;
+
+      poly.on("mouseover", () => {
+        poly.setStyle({ weight: 7.5, opacity: 1 });
+      });
+
+      poly.on("mouseout", () => {
+        poly.setStyle({
+          weight: edgeObj.isCustom ? 4.8 : (edgeObj.color === "#f97316" ? 4.5 : 2.8),
+          opacity: 0.9
+        });
+      });
+
+      poly.on("click", (ev) => {
+        if (isCtrlDown || isBoxSelecting) return;
+        L.DomEvent.stopPropagation(ev);
+
+        if (editTool === "delete") {
+          deleteEdgeByObj(edgeObj);
+        } else if (editTool === "select") {
+          showInspector("edge", edgeObj);
+        }
+      });
+    }
+
+    // 通行可能な色・非封鎖道路のみを使った所要時間ベースA*ソルバー
+    function buildActivePathFinder() {
+      const g = createGraph();
+      nodesMap.forEach((n, id) => {
+        if (isNodeDrivable(n)) g.addNode(id, n);
+      });
+      edgesList.forEach(e => {
+        if (isEdgeDrivable(e)) {
+          // 距離 ÷ 制限速度 ＝ 通過所要時間（秒）をコストにすることで幹線やバイパスを賢く選ぶ
+          const travelTimeCost = e.dist / getEdgeSpeedMs(e);
+          g.addLink(e.u, e.v, { weight: travelTimeCost, edge: e });
+          if (!e.oneway) {
+            g.addLink(e.v, e.u, { weight: travelTimeCost, edge: e });
+          }
+        }
+      });
+      return ngraphPath.aStar(g, {
+        distance(fromNode, toNode, link) {
+          return link.data.weight;
+        }
+      });
+    }
+
+    // 削除・通行止め後に全車両のルート安全性を検証し再ルーティング
+    function validateAndRerouteVehicles() {
+      const finder = buildActivePathFinder();
+      const drivableNodeIds = Array.from(nodesMap.values())
+        .filter(n => isNodeDrivable(n))
+        .map(n => n.id);
+
+      if (drivableNodeIds.length < 2) return;
+
+      vehicles.forEach(v => {
+        const curU = v.route[v.segIndex];
+        let newRoute = null;
+        if (nodesMap.has(curU) && isNodeDrivable(nodesMap.get(curU))) {
+          newRoute = createRouteFromWithFinder(curU, drivableNodeIds, finder);
+        }
+        if (!newRoute) {
+          const randStart = drivableNodeIds[Math.floor(Math.random() * drivableNodeIds.length)];
+          newRoute = createRouteFromWithFinder(randStart, drivableNodeIds, finder);
+        }
+        if (newRoute) {
+          v.route = newRoute.path;
+          v.directDist = newRoute.directDist;
+          v.routeDist = newRoute.routeDist;
+          v.segIndex = 0;
+          v.progressMeters = 0;
+        }
+      });
+    }
+
+    // 左右・上下リサイズ矢印ハンドル
+    function setupResizers() {
+      const vResizer = document.getElementById("vResizer");
+      const hResizer = document.getElementById("hResizer");
+      const sidePanel = document.getElementById("sidePanel");
+      const bottomCharts = document.getElementById("bottomCharts");
+      let resizingV = false, resizingH = false;
+
+      vResizer.addEventListener("mousedown", () => { resizingV = true; });
+      hResizer.addEventListener("mousedown", () => { resizingH = true; });
+
+      window.addEventListener("mousemove", (e) => {
+        if (resizingV) {
+          const newWidth = Math.max(180, Math.min(620, window.innerWidth - e.clientX));
+          sidePanel.style.width = `${newWidth}px`;
+          map.invalidateSize();
+          if (speedChart) speedChart.resize();
+          if (bottleneckChart) bottleneckChart.resize();
+        }
+        if (resizingH) {
+          const newHeight = Math.max(0, Math.min(450, window.innerHeight - e.clientY));
+          bottomCharts.style.height = `${newHeight}px`;
+          bottomCharts.style.display = newHeight < 30 ? "none" : "grid";
+          map.invalidateSize();
+          if (speedChart && newHeight >= 30) speedChart.resize();
+          if (bottleneckChart && newHeight >= 30) bottleneckChart.resize();
+        }
+      });
+
+      window.addEventListener("mouseup", () => {
+        resizingV = false;
+        resizingH = false;
+      });
+    }
+
+    // Ctrl + 長押しドラッグ範囲選択（一括通行止め・一括削除）
+    function setupCtrlBoxSelection() {
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "Control" && !isCtrlDown) {
+          isCtrlDown = true;
+          map.dragging.disable();
+          document.getElementById("map").style.cursor = "crosshair";
+          document.getElementById("modeBanner").innerHTML =
+            "【範囲選択モード】マウス左ボタンを<strong>長押しドラッグ</strong>して対象エリアを囲んでください";
+        }
+      });
+
+      window.addEventListener("keyup", (e) => {
+        if (e.key === "Control") {
+          isCtrlDown = false;
+          if (!isBoxSelecting) {
+            map.dragging.enable();
+            document.getElementById("map").style.cursor = "";
+            setEditTool(editTool);
+          }
+        }
+      });
+
+      map.on("mousedown", (e) => {
+        if (!e.originalEvent.ctrlKey && !isCtrlDown) return;
+        isBoxSelecting = true;
+        boxStartLatLng = e.latlng;
+        if (selectionRect) map.removeLayer(selectionRect);
+        selectionRect = L.rectangle([boxStartLatLng, boxStartLatLng], {
+          color: "#38bdf8",
+          weight: 2,
+          fillColor: "#38bdf8",
+          fillOpacity: 0.22,
+          dashArray: "5, 5"
+        }).addTo(map);
+      });
+
+      map.on("mousemove", (e) => {
+        if (!isBoxSelecting || !selectionRect) return;
+        selectionRect.setBounds([boxStartLatLng, e.latlng]);
+      });
+
+      map.on("mouseup", (e) => {
+        if (!isBoxSelecting) return;
+        isBoxSelecting = false;
+        if (!isCtrlDown) {
+          map.dragging.enable();
+          document.getElementById("map").style.cursor = "";
+          setEditTool(editTool);
+        }
+
+        const bounds = L.latLngBounds(boxStartLatLng, e.latlng);
+        pendingEdges = edgesList.filter(edge => {
+          const midLat = (edge.n1.lat + edge.n2.lat) / 2;
+          const midLon = (edge.n1.lon + edge.n2.lon) / 2;
+          return bounds.contains([edge.n1.lat, edge.n1.lon]) ||
+                 bounds.contains([edge.n2.lat, edge.n2.lon]) ||
+                 bounds.contains([midLat, midLon]);
+        });
+        pendingNodes = Array.from(nodesMap.values()).filter(n => bounds.contains([n.lat, n.lon]));
+
+        if (pendingEdges.length > 0 || pendingNodes.length > 0) {
+          document.getElementById("selectionModalText").innerHTML =
+            `選択範囲内に <strong>道路 ${pendingEdges.length} 本</strong> と <strong>ノード ${pendingNodes.length} 個</strong> が含まれています。<br>実行する操作を選択してください：`;
+          document.getElementById("selectionModal").style.display = "block";
+        } else {
+          closeSelectionModal();
+        }
+      });
+    }
+
+    function applyAreaAction(action) {
+      if (action === "block" || action === "unblock") {
+        const shouldBlock = action === "block";
+        pendingEdges.forEach(edge => {
+          edge.blocked = shouldBlock;
+          edge.poly.setStyle({
+            color: edge.blocked ? "#dc2626" : edge.color,
+            dashArray: edge.blocked ? "6, 6" : null
+          });
+        });
+      } else if (action === "delete") {
+        const edgeSet = new Set(pendingEdges);
+        const nodeSet = new Set(pendingNodes.map(n => n.id));
+        pendingNodes.forEach(n => {
+          if (n.marker) nodeLayer.removeLayer(n.marker);
+          nodesMap.delete(n.id);
+        });
+        edgesList = edgesList.filter(e => {
+          if (edgeSet.has(e) || nodeSet.has(e.u) || nodeSet.has(e.v)) {
+            if (e.poly) edgeLayer.removeLayer(e.poly);
+            return false;
+          }
+          return true;
+        });
+      }
+      updateStatusBar();
+      validateAndRerouteVehicles();
+      closeSelectionModal();
+    }
+
+    function closeSelectionModal() {
+      document.getElementById("selectionModal").style.display = "none";
+      if (selectionRect) {
+        map.removeLayer(selectionRect);
+        selectionRect = null;
+      }
+      pendingEdges = [];
+      pendingNodes = [];
+    }
+
+    function changeTrafficMode(mode) {
+      trafficMode = mode;
+      validateAndRerouteVehicles();
+    }
+
+    async function init() {
+      const res = await fetch("/api/real-map");
+      const data = await res.json();
+
+      const meta = data.metadata || {};
+      centerCoord.lat = pick(meta.center || {}, ["lat", "Lat", "y"]) ?? 35.687;
+      centerCoord.lon = pick(meta.center || {}, ["lon", "Lon", "lng", "x"]) ?? 139.327;
+
+      // 最大ズーム 22 まで許可
+      map = L.map("map", { zoomControl: true, maxZoom: 22 }).setView([centerCoord.lat, centerCoord.lon], 16);
+      switchMapStyle("esri_hd");
+
+      map.on("zoomend", () => {
+        document.getElementById("zoomBadge").textContent = `Zoom: ${map.getZoom()} / 22`;
+      });
+
+      edgeLayer = L.layerGroup().addTo(map);
+      nodeLayer = L.layerGroup().addTo(map);
+      vehicleLayer = L.layerGroup().addTo(map);
+
+      setupResizers();
+      setupCtrlBoxSelection();
+
+      // 地図クリックで新規ノード追加
+      map.on("click", (e) => {
+        if (isCtrlDown || isBoxSelecting) return;
+        if (editTool !== "addNode") return;
+        const newId = `custom_${customNodeCounter++}`;
+        const nodeObj = {
+          id: newId,
+          lat: e.latlng.lat,
+          lon: e.latlng.lng,
+          color: activeLayerColor,
+          isCustom: true
+        };
+        nodesMap.set(newId, nodeObj);
+        registerNodeMarker(nodeObj);
+        updateStatusBar();
+      });
+
+      const rawNodes = Array.isArray(data.nodes)
+        ? data.nodes
+        : Object.entries(data.nodes || {}).map(([k, v]) => ({ id: k, ...v }));
+
+      const boundsPoints = [];
+      rawNodes.forEach(n => {
+        const idRaw = pick(n, ["id", "ID", "node_id", "osmid"]);
+        const lat = Number(pick(n, ["lat", "Lat", "y", "Y", "latitude"]));
+        const lon = Number(pick(n, ["lon", "Lon", "lng", "Lng", "x", "X", "longitude"]));
+        if (idRaw === undefined || Number.isNaN(lat) || Number.isNaN(lon)) return;
+
+        const idStr = String(idRaw);
+        const nodeObj = {
+          id: idStr,
+          lat,
+          lon,
+          color: n.color || "#38bdf8",
+          isCustom: Boolean(n.isCustom)
+        };
+        nodesMap.set(idStr, nodeObj);
+        registerNodeMarker(nodeObj);
+        boundsPoints.push([lat, lon]);
+      });
+
+      const rawEdges = Array.isArray(data.edges)
+        ? data.edges
+        : Object.values(data.edges || {});
+
+      rawEdges.forEach((e, idx) => {
+        const uRaw = pick(e, ["u", "source", "from", "U", "Source", "From", "start"]);
+        const vRaw = pick(e, ["v", "target", "to", "V", "Target", "To", "end"]);
+        if (uRaw === undefined || vRaw === undefined) return;
+
+        const u = String(uRaw);
+        const v = String(vRaw);
+        const n1 = nodesMap.get(u);
+        const n2 = nodesMap.get(v);
+        if (!n1 || !n2) return;
+
+        const rawDist = Number(pick(e, ["length", "dist", "distance", "weight", "Length"]));
+        const dist = !Number.isNaN(rawDist) && rawDist > 0
+          ? rawDist
+          : haversineMeters(n1.lat, n1.lon, n2.lat, n2.lon);
+
+        const centrality = Number(pick(e, ["betweenness", "centrality", "load", "congestion", "Betweenness", "Centrality"]) ?? 0);
+        const colorHex = e.color || getDefaultColorByCentrality(centrality);
+        const name = pick(e, ["name", "Name", "road_name"]) || "区画道路";
+        const edgeObj = {
+          id: idx,
+          u,
+          v,
+          n1,
+          n2,
+          dist: Math.max(dist, 5),
+          color: colorHex,
+          centrality,
+          name,
+          blocked: Boolean(e.blocked),
+          oneway: Boolean(e.oneway),
+          isCustom: Boolean(e.isCustom),
+          passCount: 0,
+          congestionScore: 0
+        };
+        edgesList.push(edgeObj);
+        drawEdgePolyline(edgeObj);
+      });
+
+      updateStatusBar();
+      if (boundsPoints.length > 0) {
+        map.fitBounds(boundsPoints, { padding: [20, 20] });
+      }
+
+      initCharts();
+      syncVehicleCount();
+      requestAnimationFrame(animate);
+    }
+
+    function pickDestinationNode(nodeIds) {
+      if (trafficMode === "rush") {
+        const centerNodes = nodeIds.filter(id => {
+          const n = nodesMap.get(id);
+          return n && haversineMeters(n.lat, n.lon, centerCoord.lat, centerCoord.lon) < 280;
+        });
+        if (centerNodes.length > 0) {
+          return centerNodes[Math.floor(Math.random() * centerNodes.length)];
+        }
+      }
+      return nodeIds[Math.floor(Math.random() * nodeIds.length)];
+    }
+
+    function createRouteFromWithFinder(startId, drivableNodeIds, finder) {
+      if (drivableNodeIds.length < 2 || !nodesMap.has(startId)) return null;
+      const startNode = nodesMap.get(startId);
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const endId = pickDestinationNode(drivableNodeIds);
+        if (startId === endId) continue;
+        const path = finder.find(startId, endId);
+        if (path && path.length >= 2) {
+          const orderedIds = path.reverse().map(p => p.id);
+          const endNode = nodesMap.get(endId);
+          const directDist = Math.max(haversineMeters(startNode.lat, startNode.lon, endNode.lat, endNode.lon), 10);
+          let routeDist = 0;
+          for (let i = 0; i < orderedIds.length - 1; i++) {
+            const a = nodesMap.get(orderedIds[i]);
+            const b = nodesMap.get(orderedIds[i + 1]);
+            if (a && b) routeDist += haversineMeters(a.lat, a.lon, b.lat, b.lon);
+          }
+          return { path: orderedIds, directDist, routeDist: Math.max(routeDist, directDist) };
+        }
+      }
+      return null;
+    }
+
+    function createRoute() {
+      const drivableNodeIds = Array.from(nodesMap.values())
+        .filter(n => isNodeDrivable(n))
+        .map(n => n.id);
+      if (drivableNodeIds.length < 2) return null;
+      const finder = buildActivePathFinder();
+      const startId = drivableNodeIds[Math.floor(Math.random() * drivableNodeIds.length)];
+      return createRouteFromWithFinder(startId, drivableNodeIds, finder);
+    }
+
+    function spawnVehicle() {
+      const routeInfo = createRoute();
+      if (!routeInfo) return null;
+      const startNode = nodesMap.get(routeInfo.path[0]);
+      const marker = L.circleMarker([startNode.lat, startNode.lon], {
+        radius: 5,
+        fillColor: "#22c55e",
+        color: "#ffffff",
+        weight: 1.5,
+        fillOpacity: 0.95
+      }).addTo(vehicleLayer);
+
+      return {
+        route: routeInfo.path,
+        directDist: routeInfo.directDist,
+        routeDist: routeInfo.routeDist,
+        segIndex: 0,
+        progressMeters: 0,
+        speed: 8 + Math.random() * 4,
+        desiredSpeed: 11.1,
+        lat: startNode.lat,
+        lon: startNode.lon,
+        marker
+      };
+    }
+
+    function syncVehicleCount() {
+      while (vehicles.length < targetVehicleCount) {
+        const v = spawnVehicle();
+        if (!v) break;
+        vehicles.push(v);
+      }
+      while (vehicles.length > targetVehicleCount) {
+        const removed = vehicles.pop();
+        vehicleLayer.removeLayer(removed.marker);
+      }
+      document.getElementById("vehCountDisplay").textContent = vehicles.length;
+    }
+
+    function changeVehicleCount(delta) {
+      targetVehicleCount = Math.max(10, Math.min(250, targetVehicleCount + delta));
+      syncVehicleCount();
+    }
+
+    function toggleSimulation() {
+      isRunning = !isRunning;
+      document.getElementById("toggleBtn").textContent = isRunning ? "一時停止" : "再開";
+    }
+
+    function exportCustomGraph() {
+      const exportData = {
+        metadata: {
+          location: "Event Area (v2.3 Edited)",
+          node_count: nodesMap.size,
+          edge_count: edgesList.length,
+          center: centerCoord
+        },
+        nodes: Array.from(nodesMap.values()).map(n => ({
+          id: n.id,
+          lat: n.lat,
+          lon: n.lon,
+          color: n.color,
+          isCustom: n.isCustom
+        })),
+        edges: edgesList.map(e => ({
+          u: e.u,
+          v: e.v,
+          length: Number(e.dist.toFixed(2)),
+          color: e.color,
+          betweenness: e.centrality,
+          name: e.name,
+          blocked: e.blocked,
+          oneway: e.oneway,
+          isCustom: e.isCustom
+        }))
+      };
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "campus_graph_v23.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // 高速ルックアップ用エッジマップ生成
+    function findEdgeBetween(uId, vId) {
+      return edgesList.find(e => (e.u === uId && e.v === vId) || (!e.oneway && e.u === vId && e.v === uId));
+    }
+
+    let lastTime = performance.now();
+    let chartTimer = 0;
+
+    function animate(now) {
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      if (isRunning && vehicles.length > 0) {
+        let totalSpeedKmh = 0;
+        let jammedCount = 0;
+        let detourSum = 0;
+
+        // 混雑スコアの自然減衰
+        edgesList.forEach(e => { e.congestionScore *= 0.96; });
+
+        for (let i = 0; i < vehicles.length; i++) {
+          const v = vehicles[i];
+          const uId = v.route[v.segIndex];
+          const vId = v.route[v.segIndex + 1];
+          const n1 = nodesMap.get(uId);
+          const n2 = nodesMap.get(vId);
+          if (!n1 || !n2) continue;
+
+          const curEdge = findEdgeBetween(uId, vId);
+          const segDesiredSpeed = curEdge ? getEdgeSpeedMs(curEdge) : 11.1;
+          const segDist = Math.max(haversineMeters(n1.lat, n1.lon, n2.lat, n2.lon), 5);
+
+          let minGap = 999;
+          let leadSpeed = segDesiredSpeed;
+          for (let j = 0; j < vehicles.length; j++) {
+            if (i === j) continue;
+            const other = vehicles[j];
+            if (other.route[other.segIndex] === uId && other.route[other.segIndex + 1] === vId) {
+              const gap = other.progressMeters - v.progressMeters;
+              if (gap > 0 && gap < minGap) {
+                minGap = gap;
+                leadSpeed = other.speed;
+              }
+            }
+          }
+
+          const s0 = 6.0;
+          const T = 1.5;
+          const aMax = 1.8;
+          const bComf = 2.5;
+          const deltaV = v.speed - leadSpeed;
+          const sStar = s0 + Math.max(0, v.speed * T + (v.speed * deltaV) / (2 * Math.sqrt(aMax * bComf)));
+          const acc = aMax * (1 - Math.pow(v.speed / segDesiredSpeed, 4) - (minGap < 120 ? Math.pow(sStar / Math.max(minGap, 1.5), 2) : 0));
+
+          v.speed = Math.max(0.5, Math.min(segDesiredSpeed, v.speed + acc * dt));
+          v.progressMeters += v.speed * dt;
+
+          // リアルタイム混雑負荷スコア加算（速度低下が大きいほどボトルネック負荷が高い）
+          if (curEdge) {
+            const delayRatio = Math.max(0.1, 1 - (v.speed / segDesiredSpeed));
+            curEdge.congestionScore += delayRatio * dt * 10;
+          }
+
+          if (v.progressMeters >= segDist) {
+            if (curEdge) curEdge.passCount = (curEdge.passCount || 0) + 1;
+            v.progressMeters -= segDist;
+            v.segIndex++;
+            if (v.segIndex >= v.route.length - 1) {
+              const newRoute = createRoute();
+              if (newRoute) {
+                v.route = newRoute.path;
+                v.directDist = newRoute.directDist;
+                v.routeDist = newRoute.routeDist;
+                v.segIndex = 0;
+                v.progressMeters = 0;
+              }
+            }
+          }
+
+          const curU = nodesMap.get(v.route[v.segIndex]);
+          const curV = nodesMap.get(v.route[v.segIndex + 1]);
+          if (curU && curV) {
+            const curLen = Math.max(haversineMeters(curU.lat, curU.lon, curV.lat, curV.lon), 5);
+            const ratio = Math.min(1, v.progressMeters / curLen);
+            v.lat = curU.lat + (curV.lat - curU.lat) * ratio;
+            v.lon = curU.lon + (curV.lon - curU.lon) * ratio;
+            v.marker.setLatLng([v.lat, v.lon]);
+          }
+
+          const speedKmh = v.speed * 3.6;
+          totalSpeedKmh += speedKmh;
+          detourSum += (v.routeDist / v.directDist);
+
+          if (speedKmh < 15) {
+            jammedCount++;
+            v.marker.setStyle({ fillColor: "#ef4444" });
+          } else if (speedKmh < 28) {
+            v.marker.setStyle({ fillColor: "#f59e0b" });
+          } else {
+            v.marker.setStyle({ fillColor: "#22c55e" });
+          }
+        }
+
+        const avgSpeed = (totalSpeedKmh / vehicles.length).toFixed(1);
+        const avgDetour = (detourSum / vehicles.length).toFixed(2);
+        document.getElementById("avgSpeedKpi").textContent = `${avgSpeed} km/h`;
+        document.getElementById("jamCountKpi").textContent = `${jammedCount} 台`;
+        document.getElementById("detourRatioKpi").textContent = `${avgDetour}x`;
+
+        chartTimer += dt;
+        if (chartTimer >= 1.0) {
+          chartTimer = 0;
+          updateCharts(Number(avgSpeed), jammedCount);
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    function initCharts() {
+      speedChart = echarts.init(document.getElementById("speedChart"));
+      bottleneckChart = echarts.init(document.getElementById("bottleneckChart"));
+
+      window.addEventListener("resize", () => {
+        speedChart.resize();
+        bottleneckChart.resize();
+      });
+    }
+
+    function updateCharts(avgSpeed, jammedCount) {
+      const nowLabel = new Date().toLocaleTimeString("ja-JP", { hour12: false });
+      timeLabels.push(nowLabel);
+      speedHistory.push(avgSpeed);
+      jamHistory.push(jammedCount);
+      if (timeLabels.length > 30) {
+        timeLabels.shift();
+        speedHistory.shift();
+        jamHistory.shift();
+      }
+
+      speedChart.setOption({
+        title: { text: "空間平均速度 & 渋滞車両数推移", textStyle: { color: "#e2e8f0", fontSize: 12 }, left: 8, top: 4 },
+        tooltip: { trigger: "axis" },
+        legend: { data: ["空間平均速度(km/h)", "渋滞台数"], textStyle: { color: "#9ca3af", fontSize: 10 }, right: 10, top: 4 },
+        grid: { left: 40, right: 35, top: 34, bottom: 22 },
+        xAxis: { type: "category", data: timeLabels, axisLabel: { color: "#9ca3af", fontSize: 10 } },
+        yAxis: [
+          { type: "value", min: 0, max: 60, axisLabel: { color: "#38bdf8", fontSize: 10 }, splitLine: { lineStyle: { color: "#374151" } } },
+          { type: "value", min: 0, axisLabel: { color: "#ef4444", fontSize: 10 }, splitLine: { show: false } }
+        ],
+        series: [
+          { name: "空間平均速度(km/h)", type: "line", smooth: true, data: speedHistory, itemStyle: { color: "#38bdf8" } },
+          { name: "渋滞台数", type: "line", smooth: true, yAxisIndex: 1, data: jamHistory, itemStyle: { color: "#ef4444" } }
+        ]
+      });
+
+      // リアルタイム動的混雑ボトルネック TOP5 を毎秒更新
+      const dynamicTop = [...edgesList]
+        .filter(e => !e.blocked)
+        .sort((a, b) => (b.congestionScore + b.centrality * 5) - (a.congestionScore + a.centrality * 5))
+        .slice(0, 5);
+
+      bottleneckChart.setOption({
+        title: { text: "リアルタイム動的ボトルネック TOP5（実測負荷）", textStyle: { color: "#e2e8f0", fontSize: 12 }, left: 8, top: 4 },
+        tooltip: { trigger: "axis" },
+        grid: { left: 115, right: 20, top: 32, bottom: 18 },
+        xAxis: { type: "value", axisLabel: { color: "#9ca3af", fontSize: 10 }, splitLine: { lineStyle: { color: "#374151" } } },
+        yAxis: {
+          type: "category",
+          inverse: true,
+          data: dynamicTop.map(e => `${e.name.slice(0, 6)}#${e.id} (${e.dist.toFixed(0)}m)`),
+          axisLabel: { color: "#cbd5e1", fontSize: 10 }
+        },
+        series: [{
+          type: "bar",
+          data: dynamicTop.map(e => Number((e.congestionScore + e.centrality * 10).toFixed(1))),
+          itemStyle: { color: "#f97316", borderRadius: [0, 4, 4, 0] }
+        }]
+      });
+    }
+
+    init();
   </script>
 </body>
 </html>

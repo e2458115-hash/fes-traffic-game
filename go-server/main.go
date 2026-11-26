@@ -330,5 +330,6 @@ func main() {
 	fmt.Println("📊 Dashboard running at http://localhost:8080/dashboard.html")
 	fmt.Println("🗺️  Real Map API running at http://localhost:8080/api/real-map")
 	fmt.Println("🔗 Python Engine URL:", getPythonEngineURL())
+	initTwinEngine()
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

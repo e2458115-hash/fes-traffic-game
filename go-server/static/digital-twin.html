@@ -3,627 +3,498 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>デジタルツイン交通管制システム | Real-World Traffic Control</title>
+  <title>Digital Twin Traffic Control v3.4 (Clean Campus)</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #0b1120;
-      color: #f1f5f9;
-      height: 100vh;
+      background: #0b0f19;
+      color: #e2e8f0;
       display: flex;
       flex-direction: column;
+      height: 100vh;
       overflow: hidden;
+      user-select: none;
     }
     header {
-      background: #0f172a;
-      border-bottom: 1px solid #1e293b;
-      padding: 12px 24px;
+      height: 48px;
+      background: #111827;
+      border-bottom: 1px solid #1f2937;
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      z-index: 10;
+      justify-content: space-between;
+      padding: 0 14px;
+      gap: 10px;
+      z-index: 1000;
     }
-    .title-group { display: flex; align-items: center; gap: 12px; }
+    .title-area { display: flex; align-items: center; gap: 8px; }
     .badge {
-      background: #0284c7;
+      background: #059669;
       color: #fff;
-      font-size: 0.75rem;
-      font-weight: bold;
-      padding: 3px 8px;
-      border-radius: 4px;
-      letter-spacing: 0.05em;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
     }
-    h1 { font-size: 1.15rem; font-weight: 700; color: #f8fafc; }
-    .nav-links { display: flex; gap: 10px; }
-    .nav-links a {
-      color: #94a3b8;
-      text-decoration: none;
-      font-size: 0.85rem;
-      padding: 6px 12px;
+    .controls { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+    button {
+      background: #1f2937;
+      color: #f3f4f6;
+      border: 1px solid #374151;
+      padding: 5px 10px;
       border-radius: 6px;
-      background: #1e293b;
-      transition: 0.2s;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.15s;
     }
-    .nav-links a:hover { background: #334155; color: #fff; }
+    button:hover { background: #374151; }
+    button.primary { background: #2563eb; border-color: #3b82f6; }
+    button.danger { background: #dc2626; border-color: #ef4444; font-weight: 700; }
+    button.warn-btn { background: #d97706; border-color: #f59e0b; font-weight: 700; }
+    button.success { background: #059669; border-color: #10b981; font-weight: 700; }
 
-    .main-container {
-      display: flex;
+    .map-wrapper {
       flex: 1;
       position: relative;
-      overflow: hidden;
+      width: 100%;
+      height: 100%;
     }
-    canvas {
-      flex: 1;
-      display: block;
-      cursor: grab;
-      background: radial-gradient(circle at center, #111827 0%, #090d16 100%);
-    }
-    canvas:active { cursor: grabbing; }
+    #map { width: 100%; height: 100%; background: #0b0f19; }
 
-    .sidebar {
-      width: 320px;
-      background: rgba(15, 23, 42, 0.95);
-      border-left: 1px solid #1e293b;
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      overflow-y: auto;
-      z-index: 5;
-    }
-    .card {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      padding: 14px;
-    }
-    .card h2 {
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: #94a3b8;
-      margin-bottom: 10px;
-      border-bottom: 1px solid #334155;
-      padding-bottom: 6px;
-    }
-    .stat-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .stat-item {
-      background: #0f172a;
-      padding: 10px;
-      border-radius: 6px;
-    }
-    .stat-label { font-size: 0.75rem; color: #94a3b8; }
-    .stat-value { font-size: 1.2rem; font-weight: bold; color: #38bdf8; margin-top: 2px; }
-    .stat-value.warn { color: #f87171; }
+    /* OpenStreetMap 反転ダークマップ */
+    .osm-dark-tiles { filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(95%); }
 
-    .control-row {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-    .control-row label {
-      font-size: 0.82rem;
-      color: #cbd5e1;
-      display: flex;
-      justify-content: space-between;
-    }
-    input[type="range"] { width: 100%; accent-color: #38bdf8; }
-    .btn-group { display: flex; gap: 8px; }
-    button {
-      flex: 1;
-      padding: 9px 12px;
-      border: none;
-      border-radius: 6px;
-      font-weight: bold;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-    .btn-primary { background: #0284c7; color: #fff; }
-    .btn-primary:hover { background: #0369a1; }
-    .btn-secondary { background: #334155; color: #f1f5f9; }
-    .btn-secondary:hover { background: #475569; }
-
-    .legend {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 0.8rem;
-    }
-    .legend-bar {
-      height: 10px;
-      border-radius: 5px;
-      background: linear-gradient(90deg, #3b82f6 0%, #eab308 50%, #ef4444 100%);
-    }
-    .legend-labels {
-      display: flex;
-      justify-content: space-between;
-      color: #94a3b8;
-      font-size: 0.72rem;
-    }
-    .inspector-box {
-      font-size: 0.82rem;
-      line-height: 1.6;
-      color: #e2e8f0;
-      min-height: 85px;
-    }
-    .hint {
+    .mode-banner {
       position: absolute;
-      bottom: 14px;
-      left: 16px;
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid #334155;
-      padding: 8px 14px;
+      top: 12px;
+      left: 52px;
+      background: rgba(17, 24, 39, 0.92);
+      border: 1px solid #374151;
+      color: #e2e8f0;
+      padding: 6px 12px;
       border-radius: 6px;
-      font-size: 0.78rem;
-      color: #94a3b8;
+      font-size: 12px;
+      z-index: 950;
       pointer-events: none;
     }
+
+    .zoom-badge {
+      position: absolute;
+      bottom: 24px;
+      left: 12px;
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid #374151;
+      color: #38bdf8;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      z-index: 950;
+      pointer-events: none;
+    }
+
+    .selection-modal {
+      display: none;
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(17, 24, 39, 0.97);
+      border: 2px solid #38bdf8;
+      border-radius: 10px;
+      padding: 14px 20px;
+      z-index: 2000;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.85);
+      min-width: 360px;
+      text-align: center;
+    }
+    .selection-modal h4 { font-size: 14px; margin-bottom: 6px; color: #f8fafc; }
+    .selection-modal p { font-size: 12px; color: #cbd5e1; margin-bottom: 12px; }
+    .modal-btns { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
   <header>
-    <div class="title-group">
-      <span class="badge">DIGITAL TWIN v1.0</span>
-      <h1>キャンパス周辺 実道路ネットワーク交通管制システム</h1>
+    <div class="title-area">
+      <strong>Digital Twin Traffic Control</strong>
+      <span class="badge">v3.4 Clean Campus</span>
+      <span id="locationLabel" style="font-size:12px; color:#9ca3af;">Connecting...</span>
     </div>
-    <div class="nav-links">
-      <a href="/index.html">🎮 従来シミュレーター</a>
-      <a href="/dashboard.html">📊 サーバー監視</a>
-      <a href="/api/real-map" target="_blank">📄 Raw JSON</a>
+
+    <div class="controls">
+      <button onclick="fitAllNetwork()">全体表示</button>
+      <span>車両: <strong id="vehCountDisplay">--</strong>台</span>
+      <button onclick="sendCommand({ action: 'set_vehicle_count', delta: -10 })">-10</button>
+      <button onclick="sendCommand({ action: 'set_vehicle_count', delta: 10 })">+10</button>
+      <button class="primary" id="toggleBtn" onclick="sendCommand({ action: 'toggle_pause' })">一時停止</button>
+      <button class="danger" onclick="if(confirm('地図を初期状態にリセットしますか？')) sendCommand({ action: 'reset_map' })">リセット</button>
     </div>
   </header>
 
-  <div class="main-container">
-    <canvas id="mapCanvas"></canvas>
-    <div class="hint">🖱️ ドラッグで移動 / ホイールで拡大・縮小 / 道路や交差点にカーソルを合わせて詳細表示</div>
+  <div class="map-wrapper">
+    <div id="map"></div>
 
-    <aside class="sidebar">
-      <div class="card">
-        <h2>ネットワーク統計 (OSM実データ)</h2>
-        <div class="stat-grid">
-          <div class="stat-item">
-            <div class="stat-label">交差点ノード数</div>
-            <div class="stat-value" id="nodeCount">-</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">道路エッジ数</div>
-            <div class="stat-value" id="edgeCount">-</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">稼働車両エージェント</div>
-            <div class="stat-value" id="activeCars">0</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">Goサーバー混雑指数</div>
-            <div class="stat-value warn" id="serverCongestion">-</div>
-          </div>
-        </div>
-      </div>
+    <div class="mode-banner">
+      <strong>操作:</strong> <code>Ctrl + マウスドラッグ</code> で範囲選択（白枠ハイライト → 一括通行止め / 削除）
+    </div>
+    <div class="zoom-badge" id="zoomBadge">Zoom: 17 / 28</div>
 
-      <div class="card">
-        <h2>ボトルネックヒートマップ (媒介中心性)</h2>
-        <div class="legend">
-          <div class="legend-bar"></div>
-          <div class="legend-labels">
-            <span>低 (迂回路)</span>
-            <span>中 (幹線)</span>
-            <span>高 (ボトルネック)</span>
-          </div>
-          <label style="margin-top:6px; display:flex; align-items:center; gap:6px; cursor:pointer;">
-            <input type="checkbox" id="toggleHeatmap" checked />
-            <span>媒介中心性ヒートマップを有効化</span>
-          </label>
-          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-            <input type="checkbox" id="toggleNodes" checked />
-            <span>交差点ノードを表示</span>
-          </label>
-        </div>
+    <div class="selection-modal" id="selectionModal">
+      <h4>範囲選択中の要素を一括操作</h4>
+      <p id="selectionModalText">選択範囲内に 0 本の道路と 0 個のノードが含まれています。</p>
+      <div class="modal-btns">
+        <button class="warn-btn" onclick="applyAreaAction('block')">一括通行止め</button>
+        <button class="success" onclick="applyAreaAction('unblock')">通行止め解除</button>
+        <button class="danger" onclick="applyAreaAction('delete')">範囲内を一括削除</button>
+        <button onclick="closeSelectionModal()">選択解除</button>
       </div>
-
-      <div class="card">
-        <h2>マルチエージェント交通流シミュレーション</h2>
-        <div class="control-row">
-          <label>
-            <span>流入車両台数</span>
-            <span id="carCountLabel">40 台</span>
-          </label>
-          <input type="range" id="carSlider" min="5" max="150" value="40" />
-        </div>
-        <div class="btn-group">
-          <button class="btn-primary" id="toggleSimBtn">⏸ 一時停止</button>
-          <button class="btn-secondary" id="resetViewBtn">🎯 全体表示</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>道路・交差点インスペクター</h2>
-        <div class="inspector-box" id="inspector">
-          地図上の道路または交差点にマウスカーソルを合わせると、道路種別・区間長・ボトルネック指数が表示されます。
-        </div>
-      </div>
-    </aside>
+    </div>
   </div>
 
   <script>
-    const canvas = document.getElementById("mapCanvas");
-    const ctx = canvas.getContext("2d");
+    const MAX_MAP_ZOOM = 28;
+    let map;
+    let edgeLayerGroup, highlightLayerGroup, nodeLayerGroup, vehicleLayerGroup, selectionLayerGroup;
+    let latestState = null;
+    let lastMapRevision = -1;
+    let mapInitialized = false;
 
-    let nodesMap = new Map();
-    let edges = [];
-    let adjacency = new Map();
-    let maxCentrality = 0.0001;
+    let selectedTarget = null;
+    let areaDragStart = null;
+    let areaRectLayer = null;
+    let selectedAreaItems = { nodeIds: [], edgeIds: [] };
 
-    // 描画カメラパラメータ
-    let bounds = { minX: 0, maxX: 1, minY: 0, maxY: 1 };
-    let camera = { offsetX: 0, offsetY: 0, scale: 1 };
-    let isDragging = false;
-    let dragStart = { x: 0, y: 0 };
-    let hoveredItem = null;
+    function initMap() {
+      map = L.map("map", {
+        zoomControl: true,
+        minZoom: 1,
+        maxZoom: MAX_MAP_ZOOM,
+        zoomSnap: 0.5,
+        zoomDelta: 1,
+        wheelPxPerZoomLevel: 50,
+        boxZoom: false
+      }).setView([35.687, 139.327], 17);
 
-    // シミュレーション用車両エージェント
-    let vehicles = [];
-    let isSimRunning = true;
-    let targetCarCount = 40;
+      // ご指定の「ダーク地図: OpenStreetMap 反転」
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        minZoom: 1,
+        maxZoom: MAX_MAP_ZOOM,
+        maxNativeZoom: 19,
+        className: "osm-dark-tiles",
+        attribution: "&copy; OpenStreetMap"
+      }).addTo(map);
 
-    function resizeCanvas() {
-      canvas.width = canvas.clientWidth;
-      canvas.height = canvas.clientHeight;
+      edgeLayerGroup = L.layerGroup().addTo(map);
+      highlightLayerGroup = L.layerGroup().addTo(map);
+      nodeLayerGroup = L.layerGroup().addTo(map);
+      vehicleLayerGroup = L.layerGroup().addTo(map);
+      selectionLayerGroup = L.layerGroup().addTo(map);
+
+      map.on("zoomend", () => {
+        document.getElementById("zoomBadge").textContent = `Zoom: ${map.getZoom()} / ${MAX_MAP_ZOOM}`;
+        if (latestState) {
+          renderNetwork(latestState);
+          renderVehicles(latestState.vehicles);
+        }
+      });
+
+      map.on("click", (e) => {
+        if (!e.originalEvent.ctrlKey) {
+          selectedTarget = null;
+          renderSelectionHighlights();
+        }
+      });
+
+      // Ctrl + マウスドラッグで範囲選択
+      map.on("mousedown", (e) => {
+        const isCtrlDrag = e.originalEvent && (e.originalEvent.ctrlKey || e.originalEvent.metaKey);
+        if (!isCtrlDrag) return;
+
+        L.DomEvent.stopPropagation(e);
+        L.DomEvent.preventDefault(e.originalEvent);
+        map.dragging.disable();
+        areaDragStart = e.latlng;
+        selectionLayerGroup.clearLayers();
+        selectedAreaItems = { nodeIds: [], edgeIds: [] };
+        renderSelectionHighlights();
+
+        areaRectLayer = L.rectangle([areaDragStart, areaDragStart], {
+          color: "#ffffff",
+          weight: 2,
+          dashArray: "5, 5",
+          fillColor: "#38bdf8",
+          fillOpacity: 0.22
+        }).addTo(selectionLayerGroup);
+      });
+
+      map.on("mousemove", (e) => {
+        if (areaDragStart && areaRectLayer) {
+          const bounds = L.latLngBounds(areaDragStart, e.latlng);
+          areaRectLayer.setBounds(bounds);
+          computeAreaItems(bounds);
+          renderSelectionHighlights();
+        }
+      });
+
+      window.addEventListener("mouseup", () => {
+        if (!areaDragStart) return;
+        map.dragging.enable();
+        const bounds = areaRectLayer.getBounds();
+        areaDragStart = null;
+        openAreaSelectionModal(bounds);
+      });
     }
-    window.addEventListener("resize", () => {
-      resizeCanvas();
-      fitMapToScreen();
-    });
 
-    // 緯度経度からキャンバス基準座標への変換
-    function geoToWorld(lon, lat) {
-      const cosLat = Math.cos(((bounds.minY + bounds.maxY) / 2) * Math.PI / 180);
-      return {
-        x: (lon - bounds.minX) * cosLat,
-        y: (bounds.maxY - lat)
-      };
-    }
-
-    function worldToScreen(wx, wy) {
-      return {
-        x: wx * camera.scale + camera.offsetX,
-        y: wy * camera.scale + camera.offsetY
-      };
-    }
-
-    function fitMapToScreen() {
-      const p1 = geoToWorld(bounds.minX, bounds.maxY);
-      const p2 = geoToWorld(bounds.maxX, bounds.minY);
-      const worldW = Math.max(p2.x - p1.x, 1e-6);
-      const worldH = Math.max(p2.y - p1.y, 1e-6);
-
-      const padding = 50;
-      const scaleX = (canvas.width - padding * 2) / worldW;
-      const scaleY = (canvas.height - padding * 2) / worldH;
-      camera.scale = Math.min(scaleX, scaleY);
-
-      camera.offsetX = (canvas.width - worldW * camera.scale) / 2;
-      camera.offsetY = (canvas.height - worldH * camera.scale) / 2;
-    }
-
-    // ボトルネック度に応じたヒートマップカラー
-    function getHeatColor(ratio) {
-      const r = Math.min(1, Math.max(0, ratio));
-      if (r < 0.5) {
-        const t = r * 2;
-        const red = Math.round(59 + (234 - 59) * t);
-        const green = Math.round(130 + (179 - 130) * t);
-        const blue = Math.round(246 + (8 - 246) * t);
-        return `rgb(${red},${green},${blue})`;
-      } else {
-        const t = (r - 0.5) * 2;
-        const red = Math.round(234 + (239 - 234) * t);
-        const green = Math.round(179 + (68 - 179) * t);
-        const blue = Math.round(8 + (68 - 8) * t);
-        return `rgb(${red},${green},${blue})`;
+    function fitAllNetwork() {
+      if (!latestState || !latestState.nodes) return;
+      const coords = Object.values(latestState.nodes).map(n => [n.lat, n.lon]);
+      if (coords.length > 0) {
+        map.fitBounds(L.latLngBounds(coords), { padding: [35, 35] });
       }
     }
 
-    // 地図データの読み込みと正規化
-    async function loadRealMap() {
+    async function sendCommand(payload) {
       try {
-        const res = await fetch("/api/real-map");
-        const raw = await res.json();
-
-        let minLon = Infinity, maxLon = -Infinity;
-        let minLat = Infinity, maxLat = -Infinity;
-
-        const rawNodes = Array.isArray(raw.nodes)
-          ? raw.nodes
-          : Object.entries(raw.nodes || {}).map(([id, val]) => ({ id, ...val }));
-
-        rawNodes.forEach(n => {
-          const id = String(n.id);
-          const lon = Number(n.x ?? n.lon ?? n.lng);
-          const lat = Number(n.y ?? n.lat);
-          if (!isNaN(lon) && !isNaN(lat)) {
-            nodesMap.set(id, { id, lon, lat });
-            adjacency.set(id, []);
-            if (lon < minLon) minLon = lon;
-            if (lon > maxLon) maxLon = lon;
-            if (lat < minLat) minLat = lat;
-            if (lat > maxLat) maxLat = lat;
-          }
+        await fetch("/api/twin/command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
         });
-
-        bounds = { minX: minLon, maxX: maxLon, minY: minLat, maxY: maxLat };
-
-        const rawEdges = raw.links || raw.edges || [];
-        rawEdges.forEach(e => {
-          const src = String(e.source ?? e.from);
-          const dst = String(e.target ?? e.to);
-          if (nodesMap.has(src) && nodesMap.has(dst)) {
-            const c = Number(e.centrality || 0);
-            if (c > maxCentrality) maxCentrality = c;
-            const edgeObj = {
-              source: src,
-              target: dst,
-              centrality: c,
-              length: Number(e.length || 30),
-              highway: Array.isArray(e.highway) ? e.highway.join("/") : (e.highway || "road")
-            };
-            edges.push(edgeObj);
-            adjacency.get(src).push(edgeObj);
-          }
-        });
-
-        document.getElementById("nodeCount").textContent = nodesMap.size.toLocaleString();
-        document.getElementById("edgeCount").textContent = edges.length.toLocaleString();
-
-        resizeCanvas();
-        fitMapToScreen();
-        spawnVehicles(targetCarCount);
-        requestAnimationFrame(renderLoop);
       } catch (err) {
-        console.error("地図読み込みエラー:", err);
-        document.getElementById("inspector").textContent = "地図データの読み込みに失敗しました。Goサーバーが起動しているか確認してください。";
+        console.error("Command failed:", err);
       }
     }
 
-    // 車両エージェントの生成
-    function spawnVehicles(count) {
-      const nodeIds = Array.from(nodesMap.keys());
-      if (nodeIds.length === 0) return;
-
-      while (vehicles.length < count) {
-        const startId = nodeIds[Math.floor(Math.random() * nodeIds.length)];
-        const outEdges = adjacency.get(startId);
-        if (outEdges && outEdges.length > 0) {
-          const edge = outEdges[Math.floor(Math.random() * outEdges.length)];
-          vehicles.push({
-            edge,
-            progress: Math.random(),
-            speedFactor: 0.7 + Math.random() * 0.6,
-            isEmergency: Math.random() < 0.08
-          });
-        }
+    function getEdgeCoords(e, state) {
+      if (e.geometry && e.geometry.length >= 2) {
+        return e.geometry;
       }
-      if (vehicles.length > count) {
-        vehicles.length = count;
-      }
-      document.getElementById("activeCars").textContent = vehicles.length;
+      const u = state.nodes[e.u];
+      const v = state.nodes[e.v];
+      if (!u || !v) return null;
+      return [[u.lat, u.lon], [v.lat, v.lon]];
     }
 
-    function updateVehicles() {
-      if (!isSimRunning) return;
-      const nodeIds = Array.from(nodesMap.keys());
+    function computeAreaItems(bounds) {
+      if (!latestState) return;
+      const nodeIds = [];
+      const edgeIds = [];
 
-      vehicles.forEach(v => {
-        const congestionSlowdown = 1 - 0.55 * (v.edge.centrality / maxCentrality);
-        const step = (1.8 * v.speedFactor * congestionSlowdown) / Math.max(v.edge.length, 15);
-        v.progress += step;
-
-        if (v.progress >= 1) {
-          v.progress = 0;
-          const nextEdges = adjacency.get(v.edge.target);
-          if (nextEdges && nextEdges.length > 0) {
-            v.edge = nextEdges[Math.floor(Math.random() * nextEdges.length)];
-          } else {
-            const randomId = nodeIds[Math.floor(Math.random() * nodeIds.length)];
-            const restartEdges = adjacency.get(randomId);
-            if (restartEdges && restartEdges.length > 0) {
-              v.edge = restartEdges[0];
-            }
-          }
-        }
-      });
-    }
-
-    function renderLoop() {
-      updateVehicles();
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const showHeatmap = document.getElementById("toggleHeatmap").checked;
-      const showNodes = document.getElementById("toggleNodes").checked;
-
-      // 1. 道路エッジの描画
-      edges.forEach(e => {
-        const n1 = nodesMap.get(e.source);
-        const n2 = nodesMap.get(e.target);
-        const w1 = geoToWorld(n1.lon, n1.lat);
-        const w2 = geoToWorld(n2.lon, n2.lat);
-        const s1 = worldToScreen(w1.x, w1.y);
-        const s2 = worldToScreen(w2.x, w2.y);
-
-        const ratio = e.centrality / maxCentrality;
-        const isHovered = hoveredItem && hoveredItem.type === "edge" && hoveredItem.data === e;
-
-        ctx.beginPath();
-        ctx.moveTo(s1.x, s1.y);
-        ctx.lineTo(s2.x, s2.y);
-
-        if (isHovered) {
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 6;
-        } else if (showHeatmap) {
-          ctx.strokeStyle = getHeatColor(ratio);
-          ctx.lineWidth = 1.5 + ratio * 4.5;
-        } else {
-          ctx.strokeStyle = "#334155";
-          ctx.lineWidth = 2;
-        }
-        ctx.stroke();
+      Object.values(latestState.nodes || {}).forEach(n => {
+        if (bounds.contains([n.lat, n.lon])) nodeIds.push(n.id);
       });
 
-      // 2. 交差点ノードの描画
-      if (showNodes) {
-        nodesMap.forEach(n => {
-          const w = geoToWorld(n.lon, n.lat);
-          const s = worldToScreen(w.x, w.y);
-          if (s.x < -10 || s.x > canvas.width + 10 || s.y < -10 || s.y > canvas.height + 10) return;
-
-          const isHovered = hoveredItem && hoveredItem.type === "node" && hoveredItem.data === n;
-          ctx.beginPath();
-          ctx.arc(s.x, s.y, isHovered ? 5.5 : 2.2, 0, Math.PI * 2);
-          ctx.fillStyle = isHovered ? "#38bdf8" : "rgba(148, 163, 184, 0.55)";
-          ctx.fill();
-        });
-      }
-
-      // 3. 車両エージェントの描画
-      vehicles.forEach(v => {
-        const n1 = nodesMap.get(v.edge.source);
-        const n2 = nodesMap.get(v.edge.target);
-        const lon = n1.lon + (n2.lon - n1.lon) * v.progress;
-        const lat = n1.lat + (n2.lat - n1.lat) * v.progress;
-        const w = geoToWorld(lon, lat);
-        const s = worldToScreen(w.x, w.y);
-
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, v.isEmergency ? 4.2 : 3.2, 0, Math.PI * 2);
-        ctx.fillStyle = v.isEmergency ? "#f43f5e" : "#38bdf8";
-        ctx.fill();
-
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, v.isEmergency ? 7 : 5, 0, Math.PI * 2);
-        ctx.fillStyle = v.isEmergency ? "rgba(244, 63, 94, 0.25)" : "rgba(56, 189, 248, 0.25)";
-        ctx.fill();
+      (latestState.edges || []).forEach(e => {
+        const coords = getEdgeCoords(e, latestState);
+        if (!coords) return;
+        if (coords.some(pt => bounds.contains(pt))) {
+          edgeIds.push(e.id);
+        }
       });
-
-      requestAnimationFrame(renderLoop);
+      selectedAreaItems = { nodeIds, edgeIds };
     }
 
-    // マウス操作（パン・ズーム・インスペクター）
-    canvas.addEventListener("mousedown", e => {
-      isDragging = true;
-      dragStart = { x: e.clientX - camera.offsetX, y: e.clientY - camera.offsetY };
-    });
+    function openAreaSelectionModal(bounds) {
+      computeAreaItems(bounds);
+      renderSelectionHighlights();
 
-    window.addEventListener("mouseup", () => {
-      isDragging = false;
-    });
-
-    canvas.addEventListener("mousemove", e => {
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-
-      if (isDragging) {
-        camera.offsetX = e.clientX - dragStart.x;
-        camera.offsetY = e.clientY - dragStart.y;
+      const { nodeIds, edgeIds } = selectedAreaItems;
+      if (nodeIds.length === 0 && edgeIds.length === 0) {
+        selectionLayerGroup.clearLayers();
         return;
       }
 
-      let found = null;
-      let minDist = 10;
-
-      nodesMap.forEach(n => {
-        const w = geoToWorld(n.lon, n.lat);
-        const s = worldToScreen(w.x, w.y);
-        const d = Math.hypot(s.x - mx, s.y - my);
-        if (d < 8 && d < minDist) {
-          minDist = d;
-          found = { type: "node", data: n };
-        }
-      });
-
-      if (!found) {
-        edges.forEach(edge => {
-          const n1 = nodesMap.get(edge.source);
-          const n2 = nodesMap.get(edge.target);
-          const w1 = geoToWorld(n1.lon, n1.lat);
-          const w2 = geoToWorld(n2.lon, n2.lat);
-          const s1 = worldToScreen(w1.x, w1.y);
-          const s2 = worldToScreen(w2.x, w2.y);
-
-          const dist = pointToSegmentDist(mx, my, s1.x, s1.y, s2.x, s2.y);
-          if (dist < 7 && dist < minDist) {
-            minDist = dist;
-            found = { type: "edge", data: edge };
-          }
-        });
-      }
-
-      hoveredItem = found;
-      const inspector = document.getElementById("inspector");
-      if (found && found.type === "node") {
-        inspector.innerHTML = `
-          <strong>📍 交差点ノード</strong><br>
-          ID: <code>${found.data.id}</code><br>
-          接続道路数: ${(adjacency.get(found.data.id) || []).length} 本
-        `;
-      } else if (found && found.type === "edge") {
-        const ratioPct = ((found.data.centrality / maxCentrality) * 100).toFixed(1);
-        inspector.innerHTML = `
-          <strong>🛣️ 道路セグメント</strong><br>
-          種別: <b>${found.data.highway}</b><br>
-          区間距離: ${found.data.length.toFixed(1)} m<br>
-          ボトルネック指数: <b style="color:#f87171">${found.data.centrality.toFixed(4)}</b> (相対負荷 ${ratioPct}%)
-        `;
-      }
-    });
-
-    canvas.addEventListener("wheel", e => {
-      e.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-
-      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-      camera.offsetX = mx - (mx - camera.offsetX) * zoomFactor;
-      camera.offsetY = my - (my - camera.offsetY) * zoomFactor;
-      camera.scale *= zoomFactor;
-    }, { passive: false });
-
-    function pointToSegmentDist(px, py, x1, y1, x2, y2) {
-      const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
-      if (l2 === 0) return Math.hypot(px - x1, py - y1);
-      let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
-      t = Math.max(0, Math.min(1, t));
-      return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+      document.getElementById("selectionModalText").textContent =
+        `選択範囲内の ${edgeIds.length} 本の道路と ${nodeIds.length} 個のノードを白枠で強調表示しています。`;
+      document.getElementById("selectionModal").style.display = "block";
     }
 
-    document.getElementById("carSlider").addEventListener("input", e => {
-      targetCarCount = Number(e.target.value);
-      document.getElementById("carCountLabel").textContent = `${targetCarCount} 台`;
-      spawnVehicles(targetCarCount);
+    function applyAreaAction(subAction) {
+      sendCommand({
+        action: "area_action",
+        subAction,
+        nodeIds: selectedAreaItems.nodeIds,
+        edgeIds: selectedAreaItems.edgeIds
+      });
+      closeSelectionModal();
+    }
+
+    function closeSelectionModal() {
+      document.getElementById("selectionModal").style.display = "none";
+      selectionLayerGroup.clearLayers();
+      selectedAreaItems = { nodeIds: [], edgeIds: [] };
+      renderSelectionHighlights();
+    }
+
+    function getZoomScale() {
+      const z = map ? map.getZoom() : 17;
+      if (z <= 15) return 0.8;
+      if (z <= 18) return 1.0;
+      if (z <= 22) return 1.3;
+      return 1.6;
+    }
+
+    function renderSelectionHighlights() {
+      highlightLayerGroup.clearLayers();
+      if (!latestState || !latestState.nodes) return;
+
+      const scale = getZoomScale();
+      const highlightEdgeSet = new Set(selectedAreaItems.edgeIds);
+      const highlightNodeSet = new Set(selectedAreaItems.nodeIds);
+
+      if (selectedTarget) {
+        if (selectedTarget.type === "edge") highlightEdgeSet.add(selectedTarget.id);
+        if (selectedTarget.type === "node") highlightNodeSet.add(selectedTarget.id);
+      }
+
+      (latestState.edges || []).forEach(e => {
+        if (!highlightEdgeSet.has(e.id)) return;
+        const coords = getEdgeCoords(e, latestState);
+        if (!coords) return;
+
+        L.polyline(coords, {
+          color: "#ffffff",
+          weight: 10 * scale,
+          opacity: 0.9,
+          interactive: false
+        }).addTo(highlightLayerGroup);
+
+        L.polyline(coords, {
+          color: "#38bdf8",
+          weight: 5 * scale,
+          opacity: 1,
+          interactive: false
+        }).addTo(highlightLayerGroup);
+      });
+
+      highlightNodeSet.forEach(nodeId => {
+        const n = latestState.nodes[nodeId];
+        if (!n) return;
+        L.circleMarker([n.lat, n.lon], {
+          radius: 9 * scale,
+          color: "#ffffff",
+          weight: 2.5,
+          fillColor: "#38bdf8",
+          fillOpacity: 0.6,
+          interactive: false
+        }).addTo(highlightLayerGroup);
+      });
+    }
+
+    function renderNetwork(state) {
+      edgeLayerGroup.clearLayers();
+      nodeLayerGroup.clearLayers();
+      const scale = getZoomScale();
+
+      (state.edges || []).forEach(e => {
+        const coords = getEdgeCoords(e, state);
+        if (!coords) return;
+
+        const isBlocked = e.blocked;
+        const line = L.polyline(coords, {
+          color: isBlocked ? "#ef4444" : (e.color || "#38bdf8"),
+          weight: (isBlocked ? 5 : 3.5) * scale,
+          opacity: isBlocked ? 0.95 : 0.85,
+          dashArray: isBlocked ? "6, 8" : null
+        });
+
+        line.on("click", (ev) => {
+          if (ev.originalEvent && ev.originalEvent.ctrlKey) return;
+          L.DomEvent.stopPropagation(ev);
+          selectedTarget = { type: "edge", id: e.id };
+          selectedAreaItems = { nodeIds: [], edgeIds: [e.id] };
+          renderSelectionHighlights();
+          document.getElementById("selectionModalText").textContent =
+            `道路 #${e.id} (${e.name}) を選択中です。`;
+          document.getElementById("selectionModal").style.display = "block";
+        });
+        line.addTo(edgeLayerGroup);
+      });
+
+      Object.values(state.nodes || {}).forEach(n => {
+        const marker = L.circleMarker([n.lat, n.lon], {
+          radius: 3.5 * scale,
+          color: "#0f172a",
+          weight: 1.5,
+          fillColor: n.color || "#38bdf8",
+          fillOpacity: 0.95
+        });
+
+        marker.on("click", (ev) => {
+          if (ev.originalEvent && ev.originalEvent.ctrlKey) return;
+          L.DomEvent.stopPropagation(ev);
+          selectedTarget = { type: "node", id: n.id };
+          selectedAreaItems = { nodeIds: [n.id], edgeIds: [] };
+          renderSelectionHighlights();
+          document.getElementById("selectionModalText").textContent =
+            `ノード ${n.id} を選択中です。`;
+          document.getElementById("selectionModal").style.display = "block";
+        });
+
+        marker.addTo(nodeLayerGroup);
+      });
+
+      renderSelectionHighlights();
+    }
+
+    function renderVehicles(vehicles) {
+      vehicleLayerGroup.clearLayers();
+      const scale = getZoomScale();
+      (vehicles || []).forEach(v => {
+        L.circleMarker([v.lat, v.lon], {
+          radius: 4.5 * scale,
+          color: "#ffffff",
+          weight: 1.2,
+          fillColor: v.statusColor || "#22c55e",
+          fillOpacity: 1
+        }).bindTooltip(`車両 #${v.id}: ${v.speedKmh.toFixed(1)} km/h`).addTo(vehicleLayerGroup);
+      });
+    }
+
+    function updateUI(state) {
+      document.getElementById("locationLabel").textContent =
+        `Nodes: ${Object.keys(state.nodes || {}).length} / Edges: ${(state.edges || []).length}`;
+      document.getElementById("vehCountDisplay").textContent = (state.vehicles || []).length;
+
+      const toggleBtn = document.getElementById("toggleBtn");
+      toggleBtn.textContent = state.isRunning ? "一時停止" : "再開";
+      toggleBtn.className = state.isRunning ? "primary" : "success";
+    }
+
+    async function pollServerState() {
+      try {
+        const res = await fetch("/api/twin/state");
+        if (res.ok) {
+          const state = await res.json();
+          latestState = state;
+
+          if (!mapInitialized && state.nodes && Object.keys(state.nodes).length > 0) {
+            fitAllNetwork();
+            mapInitialized = true;
+          }
+
+          if (state.mapRevision !== lastMapRevision) {
+            renderNetwork(state);
+            lastMapRevision = state.mapRevision;
+          }
+
+          renderVehicles(state.vehicles);
+          updateUI(state);
+        }
+      } catch (e) {
+        document.getElementById("locationLabel").textContent = "Reconnecting...";
+      }
+      setTimeout(pollServerState, 50);
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      initMap();
+      pollServerState();
     });
-
-    document.getElementById("toggleSimBtn").addEventListener("click", e => {
-      isSimRunning = !isSimRunning;
-      e.target.textContent = isSimRunning ? "⏸ 一時停止" : "▶ 再生再開";
-    });
-
-    document.getElementById("resetViewBtn").addEventListener("click", fitMapToScreen);
-
-    const evtSource = new EventSource("/api/stream");
-    evtSource.onmessage = event => {
-      const state = JSON.parse(event.data);
-      document.getElementById("serverCongestion").textContent = `${state.congestion}%`;
-    };
-
-    loadRealMap();
   </script>
 </body>
 </html>
